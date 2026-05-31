@@ -109,13 +109,13 @@ body {
 .animate-royal-gradient {
   background-image: linear-gradient(
     125deg,
-    #1e1b4b,
-    #312e81,
-    #4c1d95,
-    #5b21b6,
-    #6d28d9,
-    #312e81,
-    #1e3a8a
+    #3b0a14,
+    #5c0f1f,
+    #7a1f2b,
+    #831843,
+    #9f1239,
+    #5c0f1f,
+    #4a0e1a
   );
   background-size: 400% 400%;
   animation: royal-gradient-shift 18s ease infinite;
@@ -125,4 +125,24 @@ body {
   .animate-royal-gradient {
     animation: none;
   }
+}
+
+/* CNN-style scrolling news ticker for the live results page */
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
 }

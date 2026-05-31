@@ -47,12 +47,12 @@ function RoyalBackground() {
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
-        className="absolute top-1/3 -right-24 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/20 blur-3xl"
+        className="absolute top-1/3 -right-24 h-[28rem] w-[28rem] rounded-full bg-rose-500/25 blur-3xl"
         animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
       />
       <motion.div
-        className="absolute -bottom-32 left-1/3 h-96 w-96 rounded-full bg-blue-500/20 blur-3xl"
+        className="absolute -bottom-32 left-1/3 h-96 w-96 rounded-full bg-amber-500/15 blur-3xl"
         animate={{ scale: [1, 1.1, 1], opacity: [0.4, 0.65, 0.4] }}
         transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 2 }}
       />
@@ -214,7 +214,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             <Crown className="h-10 w-10 text-amber-300" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight">Preparing your Royal Ballot</h2>
-          <p className="mt-1 text-indigo-200">Fetching candidates, please wait…</p>
+          <p className="mt-1 text-rose-100/90">Fetching candidates, please wait…</p>
         </motion.div>
       </div>
     )
@@ -233,7 +233,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             <AlertTriangle className="h-8 w-8 text-amber-300" />
           </div>
           <h2 className="text-2xl font-bold">No Candidates Available</h2>
-          <p className="mt-2 mb-6 text-indigo-200">
+          <p className="mt-2 mb-6 text-rose-100/90">
             There are currently no candidates available for voting. Please contact the election committee.
           </p>
           <Button
@@ -260,10 +260,10 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             {/* gold header band */}
             <div className="bg-gradient-to-r from-amber-400/20 via-amber-300/10 to-transparent px-8 pt-8 pb-6 text-center">
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 shadow-lg">
-                <ShieldCheck className="h-7 w-7 text-indigo-950" />
+                <ShieldCheck className="h-7 w-7 text-rose-950" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">Confirm Your Votes</h2>
-              <p className="mt-1 text-indigo-200">Review your selections before casting your ballot</p>
+              <p className="mt-1 text-rose-100/90">Review your selections before casting your ballot</p>
               <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-emerald-300">
                 <Clock className="h-4 w-4" />
                 Time remaining: {formatTime(timeLeft)}
@@ -284,7 +284,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                         {getCategoryIcon(position.category, "w-5 h-5")}
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-wide text-indigo-300">{position.category}</p>
+                        <p className="text-xs uppercase tracking-wide text-rose-200/80">{position.category}</p>
                         <p className="font-semibold">{position.name}</p>
                       </div>
                     </div>
@@ -292,11 +292,11 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                       <div className="flex items-center gap-3 text-right">
                         <div>
                           <p className="font-semibold text-emerald-300">{selectedCandidate.full_name}</p>
-                          <p className="text-xs text-indigo-200">{selectedCandidate.class}</p>
+                          <p className="text-xs text-rose-100/90">{selectedCandidate.class}</p>
                         </div>
                         <Avatar className="h-10 w-10 ring-2 ring-emerald-400/50">
                           <AvatarImage src={selectedCandidate.photo_url || "/placeholder.svg"} />
-                          <AvatarFallback className="bg-gradient-to-br from-amber-400 to-amber-600 text-xs text-indigo-950">
+                          <AvatarFallback className="bg-gradient-to-br from-amber-400 to-amber-600 text-xs text-rose-950">
                             {initials(selectedCandidate.full_name)}
                           </AvatarFallback>
                         </Avatar>
@@ -325,7 +325,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 <Button
                   onClick={submitVotes}
                   disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-amber-400 to-amber-600 font-semibold text-indigo-950 shadow-lg transition hover:from-amber-300 hover:to-amber-500"
+                  className="flex-1 bg-gradient-to-r from-amber-400 to-amber-600 font-semibold text-rose-950 shadow-lg transition hover:from-amber-300 hover:to-amber-500"
                 >
                   {isSubmitting ? (
                     <>
@@ -360,15 +360,15 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
           className="mb-6 flex flex-col items-center justify-between gap-4 rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-xl sm:flex-row"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-lg">
-              <img src="/logo.png" alt="Lubiri Secondary School" className="h-9 w-9 object-contain" />
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-amber-300/40">
+              <img src="/logo.png" alt="St. Theresa S.S. Buloba-Kasero" className="h-10 w-10 object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-300" />
-                <h1 className="text-lg font-bold leading-none text-white sm:text-xl">Royal Ballot</h1>
+                <h1 className="text-lg font-bold leading-none text-white sm:text-xl">St. Theresa S.S. Buloba-Kasero</h1>
               </div>
-              <p className="text-xs text-indigo-200">Lubiri Secondary School Elections</p>
+              <p className="text-xs italic text-amber-200/80">"Mercy Upon Us" · Royal Ballot Elections</p>
             </div>
           </div>
 
@@ -396,7 +396,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
           transition={{ delay: 0.05 }}
           className="mb-6"
         >
-          <div className="mb-2 flex items-center justify-between text-sm text-indigo-200">
+          <div className="mb-2 flex items-center justify-between text-sm text-rose-100/90">
             <span>
               {votedCount} of {positions.length} positions selected
             </span>
@@ -421,7 +421,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                   <Sparkles className="h-5 w-5 text-amber-300" />
                   Positions
                 </CardTitle>
-                <p className="text-sm text-indigo-200">Choose a candidate for each role</p>
+                <p className="text-sm text-rose-100/90">Choose a candidate for each role</p>
               </CardHeader>
               <CardContent className="space-y-2">
                 {positions.map((position, index) => {
@@ -451,7 +451,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                             <div
                               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
                                 isActive
-                                  ? "bg-gradient-to-br from-amber-300 to-amber-500 text-indigo-950"
+                                  ? "bg-gradient-to-br from-amber-300 to-amber-500 text-rose-950"
                                   : hasVote
                                     ? "bg-emerald-500 text-white"
                                     : isLocked
@@ -471,7 +471,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                               <p className={`truncate font-medium ${isActive ? "text-amber-200" : ""}`}>
                                 {position.name}
                               </p>
-                              <p className="truncate text-xs text-indigo-300">{position.category}</p>
+                              <p className="truncate text-xs text-rose-200/80">{position.category}</p>
                             </div>
                           </div>
                           {isActive && <ChevronRight className="h-5 w-5 text-amber-300" />}
@@ -504,7 +504,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                     </p>
                     <CardTitle className="mt-1 text-2xl font-bold sm:text-3xl">{currentPosition.name}</CardTitle>
                     {currentPosition.description && (
-                      <p className="mt-2 text-indigo-200">{currentPosition.description}</p>
+                      <p className="mt-2 text-rose-100/90">{currentPosition.description}</p>
                     )}
                     <Badge
                       variant="secondary"
@@ -538,7 +538,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                                 animate={{ scale: 1, rotate: 0 }}
                                 className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 shadow-lg"
                               >
-                                <Crown className="h-5 w-5 text-indigo-950" />
+                                <Crown className="h-5 w-5 text-rose-950" />
                               </motion.div>
                             )}
                             <div className="mb-4 flex items-center gap-4">
@@ -548,24 +548,24 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                                 }`}
                               >
                                 <AvatarImage src={candidate.photo_url || "/placeholder.svg"} />
-                                <AvatarFallback className="bg-gradient-to-br from-amber-400 to-amber-600 font-semibold text-indigo-950">
+                                <AvatarFallback className="bg-gradient-to-br from-amber-400 to-amber-600 font-semibold text-rose-950">
                                   {initials(candidate.full_name)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
                                 <h3 className="truncate text-lg font-bold">{candidate.full_name}</h3>
-                                <p className="text-sm text-indigo-200">{candidate.class}</p>
-                                <p className="text-xs text-indigo-300">ID: {candidate.student_id}</p>
+                                <p className="text-sm text-rose-100/90">{candidate.class}</p>
+                                <p className="text-xs text-rose-200/80">ID: {candidate.student_id}</p>
                               </div>
                             </div>
-                            <p className="line-clamp-3 rounded-lg bg-black/10 p-3 text-sm leading-relaxed text-indigo-100">
+                            <p className="line-clamp-3 rounded-lg bg-black/10 p-3 text-sm leading-relaxed text-rose-50">
                               {candidate.manifesto || "No manifesto provided."}
                             </p>
                             <div
                               className={`mt-3 flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-semibold transition ${
                                 selected
                                   ? "bg-amber-300/20 text-amber-200"
-                                  : "bg-white/5 text-indigo-200 group-hover:bg-amber-300/10 group-hover:text-amber-200"
+                                  : "bg-white/5 text-rose-100/90 group-hover:bg-amber-300/10 group-hover:text-amber-200"
                               }`}
                             >
                               {selected ? (
@@ -606,7 +606,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                           }
                         }}
                         disabled={!votes[currentPosition.id]}
-                        className="bg-gradient-to-r from-amber-400 to-amber-600 font-semibold text-indigo-950 hover:from-amber-300 hover:to-amber-500"
+                        className="bg-gradient-to-r from-amber-400 to-amber-600 font-semibold text-rose-950 hover:from-amber-300 hover:to-amber-500"
                       >
                         {currentPositionIndex === positions.length - 1 ? "Review" : "Next"}
                         <ChevronRight className="ml-2 h-4 w-4" />

@@ -106,7 +106,7 @@ export function AdminSidebar() {
         <div className="flex items-center gap-2 px-4 py-2">
           <School className="w-8 h-8 text-primary" />
           <div>
-            <h2 className="text-lg font-semibold">Lubiri Secondary</h2>
+            <h2 className="text-lg font-semibold">St. Theresa S.S.</h2>
             <p className="text-sm text-muted-foreground">Admin Panel</p>
           </div>
         </div>

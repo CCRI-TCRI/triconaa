@@ -3,8 +3,8 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Royal Ballot - Lubiri Secondary School",
-  description: "Digital voting platform for Lubiri Secondary School elections of all kinds",
+  title: "Royal Ballot - St. Theresa S.S. Buloba-Kasero",
+  description: "Digital voting platform for St. Theresa S.S. Buloba-Kasero elections of all kinds",
   Developer: "Unjovu",
   
   icons: {

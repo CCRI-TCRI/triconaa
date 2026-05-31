@@ -54,7 +54,7 @@ export default function HeadteacherLogin() {
               <GraduationCap className="w-12 h-12 text-white" />
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-800">Lubiri Secondary School</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-800">St. Theresa S.S. Buloba-Kasero</CardTitle>
               <p className="text-gray-600 mt-2">Headteacher Access Portal</p>
               <div className="mt-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium inline-block">
                 Election Oversight Dashboard

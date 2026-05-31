@@ -193,11 +193,11 @@ export default function HeadteacherResultsPage() {
         >
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-              <img src="/logo.png" alt="Lubiri Secondary School" className="w-12 h-12 object-contain" />
+              <img src="/logo.png" alt="St. Theresa S.S. Buloba-Kasero" className="w-12 h-12 object-contain" />
             </div>
             <div>
               <h2 className="text-3xl font-bold tracking-tight text-gray-900">Student Leadership Results</h2>
-              <p className="text-gray-600">Lubiri Secondary School - Democratic Election Outcomes</p>
+              <p className="text-gray-600">St. Theresa S.S. Buloba-Kasero - Democratic Election Outcomes</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

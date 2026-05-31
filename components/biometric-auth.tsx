@@ -113,13 +113,13 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
               transition={{ delay: 0.2 }}
               className="mx-auto w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center shadow-lg border"
             >
-              <img src="/logo.png" alt="Lubiri Secondary School" className="w-20 h-20 object-contain" />
+              <img src="/logo.png" alt="St. Theresa S.S. Buloba-Kasero" className="w-20 h-20 object-contain" />
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-800">Lubiri Secondary School</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-800">St. Theresa S.S. Buloba-Kasero</CardTitle>
               <p className="text-gray-600 mt-2">2025 Student OP Polls Elections</p>
               <Badge variant="secondary" className="mt-2 bg-blue-100 text-blue-800">
-                Lubiri Royal Ballot by Unjovu
+                St. Theresa Royal Ballot by Unjovu
               </Badge>
             </div>
           </CardHeader>
@@ -264,7 +264,7 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
             </AnimatePresence>
 
             <div className="text-center text-xs text-gray-500 space-y-1">
-              <p>Secure authentication powered by Lubiri Secondary School</p>
+              <p>Secure authentication powered by St. Theresa S.S. Buloba-Kasero</p>
               <p>Your vote is private and anonymous</p>
               <p className="font-semibold text-orange-600">⚠️ Each voting code can only be used once</p>
             </div>

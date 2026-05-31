@@ -134,7 +134,7 @@ export default function VotingApp() {
               transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               className="mx-auto w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl relative"
             >
-              <img src="/logo.png" alt="Lubiri Secondary School" className="w-20 h-20 object-contain" />
+              <img src="/logo.png" alt="St. Theresa S.S. Buloba-Kasero" className="w-20 h-20 object-contain" />
               <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-white">
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
