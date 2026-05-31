@@ -40,7 +40,7 @@ interface VotingBallotProps {
 function RoyalBackground() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#4c1d95]" />
+      <div className="animate-royal-gradient absolute inset-0" />
       <motion.div
         className="absolute -top-32 -left-24 h-96 w-96 rounded-full bg-amber-400/20 blur-3xl"
         animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
