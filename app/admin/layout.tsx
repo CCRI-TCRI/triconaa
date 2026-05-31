@@ -11,7 +11,9 @@ export default function AdminLayout({
     <SidebarProvider>
       <AdminSidebar />
       <SidebarInset>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 min-h-screen bg-gradient-to-br from-rose-100 via-amber-50 to-rose-50 p-6">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   )
