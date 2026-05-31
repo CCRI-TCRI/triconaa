@@ -1,0 +1,219 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { BiometricAuth } from "@/components/biometric-auth"
+import { WelcomeTutorial } from "@/components/welcome-tutorial"
+import { VotingBallot } from "@/components/voting-ballot"
+import { TutorialPopup } from "@/components/tutorial-popup"
+import { HolidayPopup } from "@/components/holiday-popup"
+import { SeasonalBackground } from "@/components/seasonal-background"
+import { AdminAccessButton } from "@/components/admin-access-button"
+import { SeasonalIntro } from "@/components/seasonal-intro"
+import { motion } from "framer-motion"
+import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { userDb } from "@/lib/db"
+import { getCurrentSeason, getSeasonalContainerClass } from "@/lib/seasons"
+
+type AppState = "auth" | "tutorial" | "voting" | "complete"
+
+export default function VotingApp() {
+  const [appState, setAppState] = useState<AppState>("auth")
+  const [studentId, setStudentId] = useState("")
+  const [studentName, setStudentName] = useState("")
+  const [showTutorial, setShowTutorial] = useState(false)
+  const [showHolidayGreeting, setShowHolidayGreeting] = useState(false)
+  const [season, setSeason] = useState(getCurrentSeason())
+
+  useEffect(() => {
+    const currentSeason = getCurrentSeason()
+    setSeason(currentSeason)
+
+    const hasSeenTutorial = localStorage.getItem("voting-tutorial-seen")
+    if (!hasSeenTutorial) setShowTutorial(true)
+
+    const hasSeenHolidayGreeting = localStorage.getItem(`holiday-greeting-${currentSeason.theme}`)
+    if (!hasSeenHolidayGreeting && currentSeason.theme !== "default") {
+      setTimeout(() => setShowHolidayGreeting(true), 1000)
+    }
+
+    if (currentSeason.theme === "halloween") {
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.classList.remove("dark")
+    }
+  }, [])
+
+  const handleAuthSuccess = async (id: string) => {
+    setStudentId(id)
+    try {
+      const user = await userDb.getById(id)
+      if (user) setStudentName(user.full_name)
+    } catch (error) {
+      console.error("Error fetching user data:", error)
+    }
+    setAppState("tutorial")
+  }
+
+  const handleTutorialComplete = () => setAppState("voting")
+  const handleVoteComplete = () => setAppState("complete")
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false)
+    localStorage.setItem("voting-tutorial-seen", "true")
+  }
+
+  const handleTutorialPopupComplete = () => {
+    setShowTutorial(false)
+    localStorage.setItem("voting-tutorial-seen", "true")
+  }
+
+  const handleHolidayClose = () => {
+    setShowHolidayGreeting(false)
+    localStorage.setItem(`holiday-greeting-${season.theme}`, "true")
+  }
+
+  const handleReturnToLogin = () => {
+    setAppState("auth")
+    setStudentId("")
+    setStudentName("")
+    setShowTutorial(false)
+    setShowHolidayGreeting(false)
+  }
+
+  if (appState === "auth") {
+    return (
+      <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
+        <SeasonalIntro />
+        <SeasonalBackground />
+        <BiometricAuth onAuthSuccess={handleAuthSuccess} />
+        <AdminAccessButton />
+        {showTutorial && <TutorialPopup onClose={handleTutorialClose} onComplete={handleTutorialPopupComplete} />}
+        {showHolidayGreeting && <HolidayPopup onClose={handleHolidayClose} />}
+      </div>
+    )
+  }
+
+  if (appState === "tutorial") {
+    return (
+      <div className="relative">
+        <SeasonalIntro />
+        <SeasonalBackground />
+        <WelcomeTutorial onComplete={handleTutorialComplete} studentName={studentName || studentId} />
+        <AdminAccessButton />
+      </div>
+    )
+  }
+
+  if (appState === "voting") {
+    return (
+      <div className="relative">
+        <SeasonalIntro />
+        <SeasonalBackground />
+        <VotingBallot studentId={studentId} onVoteComplete={handleVoteComplete} />
+        <AdminAccessButton />
+      </div>
+    )
+  }
+
+  if (appState === "complete") {
+    return (
+      <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
+        <SeasonalIntro />
+        <SeasonalBackground />
+        <AdminAccessButton />
+        <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center text-white max-w-2xl"
+          >
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+              className="mx-auto w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl relative"
+            >
+              <img src="/logo.png" alt="Lubiri Secondary School" className="w-20 h-20 object-contain" />
+              <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-white">
+                <CheckCircle className="w-8 h-8 text-white" />
+              </div>
+            </motion.div>
+
+            <motion.h1
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-4xl md:text-6xl font-bold mb-6"
+            >
+              Vote Submitted Successfully!
+            </motion.h1>
+
+            <motion.p
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="text-xl md:text-2xl mb-8 opacity-90"
+            >
+              Thank you for participating in the Trial Elections
+            </motion.p>
+
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.9 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center justify-center space-x-4 text-lg">
+                <Trophy className="w-6 h-6" />
+                <span>Your voice matters</span>
+                <Sparkles className="w-6 h-6" />
+              </div>
+
+              <p className="text-lg opacity-80">Results will be announced after the voting period ends.</p>
+
+              {season.theme !== "default" && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 1.1 }}
+                  className="mt-6 p-4 bg-white/10 rounded-lg border border-white/20"
+                >
+                  <p className="text-lg">
+                    {season.icon} {season.greeting.split("!")[0]}! Thank you for voting! {season.icon}
+                  </p>
+                </motion.div>
+              )}
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.3 }}
+                className="mt-8"
+              >
+                <Button
+                  onClick={handleReturnToLogin}
+                  className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
+                  size="lg"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Return to Login
+                </Button>
+              </motion.div>
+
+              <motion.div
+                animate={{ scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="mt-8 text-sm opacity-60"
+              >
+                System Built By Sinclaire
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
