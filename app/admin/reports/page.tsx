@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { positionStorage, candidateStorage, voteStorage, userStorage, getPositionsWithCandidates } from "@/lib/local-storage"
+import { positionDb, candidateDb, voteDb, userDb, getPositionsWithCandidates } from "@/lib/db"
 import { Download, FileText, Calendar, Users, Vote } from "lucide-react"
 
 export default function ReportsPage() {
@@ -51,8 +51,8 @@ export default function ReportsPage() {
   }
 
   const generateSummaryReport = async () => {
-    const positionsWithCandidates = getPositionsWithCandidates()
-    const votes = voteStorage.getAll()
+    const positionsWithCandidates = await getPositionsWithCandidates()
+    const votes = await voteDb.getAll()
 
     const header = ["Position", "Total Candidates", "Total Votes", "Winner", "Winner Votes"].join(",")
     const rows = []
@@ -81,12 +81,14 @@ export default function ReportsPage() {
   }
 
   const generateDetailedReport = async () => {
-    const votes = voteStorage.getAll()
-    const users = userStorage.getAll()
-    const candidates = candidateStorage.getAll()
-    const positions = positionStorage.getAll()
+    const [votes, users, candidates, positions] = await Promise.all([
+      voteDb.getAll(),
+      userDb.getAll(),
+      candidateDb.getAll(),
+      positionDb.getAll(),
+    ])
 
-    const header = ["Vote ID", "Voter Token", "Voter Name", "Candidate Name", "Position", "Vote Time"].join(",")
+    const header = ["Vote ID", "Voter Code", "Voter Name", "Candidate Name", "Position", "Vote Time"].join(",")
     const rows = votes.map((vote) => {
       const user = users.find((u) => u.id === vote.user_id)
       const candidate = candidates.find((c) => c.id === vote.candidate_id)
@@ -94,7 +96,7 @@ export default function ReportsPage() {
 
       return [
         vote.id,
-        user?.token || "Unknown",
+        user?.voting_code || "Unknown",
         user?.full_name || "Unknown",
         candidate?.full_name || "Unknown",
         position?.name || "Unknown",
@@ -106,12 +108,12 @@ export default function ReportsPage() {
   }
 
   const generateVotersReport = async () => {
-    const users = userStorage.getAll()
+    const users = await userDb.getAll()
 
-    const header = ["Token", "Full Name", "Class", "Has Voted", "Voted At"].join(",")
+    const header = ["Voting Code", "Full Name", "Class", "Has Voted", "Voted At"].join(",")
     const rows = users.map((user) =>
       [
-        user.token,
+        user.voting_code,
         user.full_name,
         user.class || "N/A",
         user.has_voted ? "Yes" : "No",
@@ -123,9 +125,11 @@ export default function ReportsPage() {
   }
 
   const generateCandidatesReport = async () => {
-    const candidates = candidateStorage.getAll()
-    const positions = positionStorage.getAll()
-    const votes = voteStorage.getAll()
+    const [candidates, positions, votes] = await Promise.all([
+      candidateDb.getAll(),
+      positionDb.getAll(),
+      voteDb.getAll(),
+    ])
 
     const header = ["Student ID", "Full Name", "Class", "Position", "Vote Count", "Manifesto"].join(",")
     const rows = candidates.map((candidate) => {

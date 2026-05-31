@@ -39,6 +39,16 @@ export const userDb = {
     if (error) { console.error("userDb.markAsVoted:", error.message); return null }
     return data
   },
+
+  // Reset every voter's has_voted flag (used by the admin "Reset System" action)
+  resetAllVotes: async (): Promise<boolean> => {
+    const { error } = await supabase
+      .from("users")
+      .update({ has_voted: false, voted_at: null })
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (error) { console.error("userDb.resetAllVotes:", error.message); return false }
+    return true
+  },
 }
 
 // ── Candidates ────────────────────────────────────────────────
@@ -137,6 +147,29 @@ export const voteDb = {
     for (const vote of votes) {
       await supabase.rpc("increment_vote_count", { candidate_id: vote.candidate_id })
     }
+    return true
+  },
+
+  getByPosition: async (positionId: string): Promise<Vote[]> => {
+    const { data, error } = await supabase.from("votes").select("*").eq("position_id", positionId)
+    if (error) { console.error("voteDb.getByPosition:", error.message); return [] }
+    return data ?? []
+  },
+
+  // Delete all cast votes and reset candidate tallies (admin "Reset System" action)
+  deleteAll: async (): Promise<boolean> => {
+    const { error: votesErr } = await supabase
+      .from("votes")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (votesErr) { console.error("voteDb.deleteAll votes:", votesErr.message); return false }
+
+    const { error: candErr } = await supabase
+      .from("candidates")
+      .update({ vote_count: 0 })
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (candErr) { console.error("voteDb.deleteAll candidates:", candErr.message); return false }
+
     return true
   },
 }

@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Shield, Lock } from "lucide-react"
 import { motion } from "framer-motion"
-import { adminStorage } from "@/lib/local-storage"
+// Admin credentials for accessing the dashboard
+const ADMIN_USERNAME = "admin"
+const ADMIN_PASSWORD = "Lavender"
 
 export function AdminAccessButton() {
   const [isOpen, setIsOpen] = useState(false)
@@ -25,7 +27,7 @@ export function AdminAccessButton() {
     // Simulate API call for better UX
     await new Promise((resolve) => setTimeout(resolve, 800))
 
-    if (adminStorage.verify(credentials.username, credentials.password)) {
+    if (credentials.username === ADMIN_USERNAME && credentials.password === ADMIN_PASSWORD) {
       window.location.href = "/admin/dashboard"
     } else {
       setError("Invalid credentials. Please try again.")

@@ -20,7 +20,7 @@ import {
   Server,
   Zap,
 } from "lucide-react"
-import { userStorage, voteStorage } from "@/lib/local-storage"
+import { userDb, voteDb } from "@/lib/db"
 
 interface SystemStatus {
   database: "online" | "offline" | "warning"
@@ -54,16 +54,10 @@ export default function ControlSystemPage() {
 
   const checkSystemStatus = async () => {
     try {
-      if (typeof window === "undefined" || !window.localStorage) {
-        setSystemStatus((prev) => ({ ...prev, database: "offline", authentication: "offline" }))
-        return
-      }
-
-      // Test local storage
+      // Query Supabase for live system stats
       try {
-        const users = userStorage.getAll()
-        const votes = voteStorage.getAll()
-        
+        const [users, votes] = await Promise.all([userDb.getAll(), voteDb.getAll()])
+
         setSystemStatus((prev) => ({ ...prev, database: "online", authentication: "online" }))
         setStats((prev) => ({
           ...prev,
@@ -74,7 +68,6 @@ export default function ControlSystemPage() {
         setSystemStatus((prev) => ({ ...prev, database: "offline" }))
       }
 
-      // Local storage is always "connected" for real-time
       setSystemStatus((prev) => ({ ...prev, realtime: "connected" }))
       setLastUpdate(new Date())
     } catch (error) {
@@ -126,16 +119,10 @@ export default function ControlSystemPage() {
 
     setLoading(true)
     try {
-      // Clear all local storage
-      if (typeof window !== "undefined" && window.localStorage) {
-        localStorage.removeItem("election_users")
-        localStorage.removeItem("election_candidates")
-        localStorage.removeItem("election_positions")
-        localStorage.removeItem("election_votes")
-        // Keep tokens and admin credentials
-      }
-      
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      // Clear all cast votes and reset voter status in Supabase
+      await voteDb.deleteAll()
+      await userDb.resetAllVotes()
+
       setSystemStatus({
         database: "online",
         voting: "inactive",
@@ -433,7 +420,7 @@ export default function ControlSystemPage() {
               </div>
               <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg text-sm">
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-blue-700 font-medium">Local Storage Verified</span>
+                <span className="text-blue-700 font-medium">Supabase Database Verified</span>
                 <span className="text-gray-500 ml-auto">{new Date(Date.now() - 60000).toLocaleTimeString()}</span>
               </div>
               <div className="flex items-center gap-3 p-2 bg-purple-50 rounded-lg text-sm">
