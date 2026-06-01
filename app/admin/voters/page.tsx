@@ -43,6 +43,7 @@ import {
     Upload,
     FileSpreadsheet,
     FileText,
+    FileDown,
     X,
   } from "lucide-react"
 
@@ -96,6 +97,7 @@ export default function VotersPage() {
   const [importFileName, setImportFileName] = useState("")
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
   const [importProgress, setImportProgress] = useState(0)
+  const [exportingPdf, setExportingPdf] = useState(false)
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -542,6 +544,146 @@ export default function VotersPage() {
     })
   }
 
+  // ── Designed PDF export (logo + school header) ────────────────
+  const loadLogo = async (): Promise<{ data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null> => {
+    try {
+      const res = await fetch("/logo.png")
+      const blob = await res.blob()
+      const data = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader()
+        fr.onload = () => resolve(fr.result as string)
+        fr.onerror = reject
+        fr.readAsDataURL(blob)
+      })
+      const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+        const img = new window.Image()
+        img.onload = () => resolve({ w: img.naturalWidth || 100, h: img.naturalHeight || 100 })
+        img.onerror = () => resolve({ w: 100, h: 100 })
+        img.src = data
+      })
+      return { data, fmt: blob.type.includes("png") ? "PNG" : "JPEG", w: dims.w, h: dims.h }
+    } catch {
+      return null
+    }
+  }
+
+  const exportVotersPDF = async () => {
+    setExportingPdf(true)
+    try {
+      const { jsPDF } = await import("jspdf")
+      const autoTable = (await import("jspdf-autotable")).default
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+
+      const maroon: [number, number, number] = [122, 31, 43]
+      const gold: [number, number, number] = [245, 200, 66]
+      const headerH = 92
+
+      const logo = await loadLogo()
+      const generatedAt = new Date().toLocaleString()
+      const list = filteredVoters
+
+      const drawHeader = () => {
+        // maroon band
+        doc.setFillColor(...maroon)
+        doc.rect(0, 0, pageW, headerH, "F")
+        // gold underline
+        doc.setFillColor(...gold)
+        doc.rect(0, headerH, pageW, 3, "F")
+
+        let textX = 40
+        if (logo) {
+          // white circle behind logo
+          const box = 58
+          const cx = 40 + box / 2
+          const cy = headerH / 2
+          doc.setFillColor(255, 255, 255)
+          doc.circle(cx, cy, box / 2 + 3, "F")
+          const ratio = logo.w / logo.h
+          let w = box
+          let h = box
+          if (ratio > 1) h = box / ratio
+          else w = box * ratio
+          doc.addImage(logo.data, logo.fmt, cx - w / 2, cy - h / 2, w, h)
+          textX = 40 + box + 16
+        }
+
+        doc.setTextColor(255, 255, 255)
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(15)
+        doc.text("ST. THERESA S.S. BULOBA-KASERO", textX, 34)
+        doc.setFont("helvetica", "italic")
+        doc.setFontSize(9)
+        doc.setTextColor(...gold)
+        doc.text('"Mercy Upon Us"', textX, 50)
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(11)
+        doc.setTextColor(255, 255, 255)
+        doc.text("Registered Voters Report", textX, 70)
+
+        // right meta
+        doc.setFontSize(8)
+        doc.setTextColor(255, 230, 230)
+        doc.text(`Generated: ${generatedAt}`, pageW - 40, 30, { align: "right" })
+        doc.text(`Total voters: ${list.length}`, pageW - 40, 44, { align: "right" })
+        doc.text(`Voted: ${list.filter((v) => v.has_voted).length}`, pageW - 40, 58, { align: "right" })
+      }
+
+      const drawFooter = (page: number, total: number) => {
+        doc.setFontSize(8)
+        doc.setTextColor(150, 150, 150)
+        doc.text("St. Theresa S.S. Buloba-Kasero · Royal Ballot Election System", 40, pageH - 24)
+        doc.text(`Page ${page} of ${total}`, pageW - 40, pageH - 24, { align: "right" })
+      }
+
+      autoTable(doc, {
+        head: [["#", "Student ID", "Full Name", "Class", "Voting Code", "Status"]],
+        body: list.map((v, i) => [
+          i + 1,
+          v.student_id,
+          v.full_name,
+          v.class,
+          v.voting_code,
+          v.has_voted ? "Voted" : "Pending",
+        ]),
+        startY: headerH + 18,
+        margin: { top: headerH + 18, left: 40, right: 40, bottom: 40 },
+        styles: { fontSize: 9, cellPadding: 5, overflow: "linebreak" },
+        headStyles: { fillColor: maroon, textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [251, 240, 233] },
+        columnStyles: {
+          0: { cellWidth: 28, halign: "center" },
+          1: { cellWidth: 80 },
+          3: { cellWidth: 50, halign: "center" },
+          4: { font: "courier", fontStyle: "bold", textColor: maroon },
+          5: { cellWidth: 60, halign: "center" },
+        },
+        didParseCell: (data) => {
+          if (data.section === "body" && data.column.index === 5) {
+            data.cell.styles.textColor = data.cell.raw === "Voted" ? [22, 130, 70] : [180, 120, 0]
+          }
+        },
+      })
+
+      const pageCount = (doc as any).getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        drawHeader()
+        drawFooter(i, pageCount)
+      }
+
+      doc.save(`st-theresa-voters-${new Date().toISOString().split("T")[0]}.pdf`)
+      toast({ title: "PDF ready", description: `Exported ${list.length} voters as PDF.` })
+    } catch (error) {
+      console.error("Error exporting PDF:", error)
+      toast({ title: "Error", description: "Failed to generate PDF.", variant: "destructive" })
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   const filteredVoters = voters.filter((voter) => {
     const matchesSearch =
       voter.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -574,7 +716,16 @@ export default function VotersPage() {
         <div className="flex gap-2">
           <Button onClick={exportVoters} variant="outline" disabled={saving}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
+          </Button>
+          <Button
+            onClick={exportVotersPDF}
+            variant="outline"
+            disabled={saving || exportingPdf || voters.length === 0}
+            className="border-rose-300 text-rose-800 hover:bg-rose-50"
+          >
+            {exportingPdf ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+            Export PDF
           </Button>
           <Dialog
             open={showImportDialog}
