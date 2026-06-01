@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
 import type { Candidate } from "@/lib/db"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import { CheckCircle2, Circle } from "lucide-react"
 
 interface PositionResult {
@@ -22,6 +23,7 @@ const initials = (name: string) =>
     .toUpperCase()
 
 export default function LiveResultsPage() {
+  const { schoolName, logoUrl } = useSchoolBranding()
   const [results, setResults] = useState<PositionResult[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [clock, setClock] = useState("")
@@ -110,7 +112,7 @@ export default function LiveResultsPage() {
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="mx-auto mb-5 h-16 w-16 rounded-full border-4 border-red-900 border-t-red-500"
           />
-          <p className="text-2xl font-black uppercase tracking-wider text-white">St. Theresa Election Center</p>
+          <p className="text-2xl font-black uppercase tracking-wider text-white">{schoolName}</p>
           <p className="mt-2 text-neutral-400">Gathering live results…</p>
         </motion.div>
       </div>
@@ -135,11 +137,11 @@ export default function LiveResultsPage() {
       <div className="flex items-stretch border-b border-neutral-800 bg-[#111]">
         <div className="flex items-center gap-3 bg-red-600 px-6 py-3">
           <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white">
-            <img src="/logo.png" alt="St. Theresa S.S." className="h-9 w-9 object-contain" />
+            <img src={logoUrl} alt={schoolName} className="h-9 w-9 object-contain" />
           </div>
-          <div className="leading-none">
-            <p className="text-sm font-black uppercase tracking-tight">St. Theresa S.S.</p>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-red-100">Buloba-Kasero</p>
+          <div className="max-w-[220px] leading-none">
+            <p className="truncate text-sm font-black uppercase tracking-tight">{schoolName}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-red-100">Election Center</p>
           </div>
         </div>
         <div className="flex flex-1 items-center justify-between px-6">

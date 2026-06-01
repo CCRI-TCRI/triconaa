@@ -20,7 +20,7 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     id: 1,
-    title: "Welcome to St. Theresa Royal Ballot E-Voting Platform",
+    title: "Welcome to the Royal Ballot E-Voting Platform",
     description: "This secure digital voting system ensures your voice is heard in school elections.",
     icon: <Vote className="w-8 h-8 text-blue-500" />,
     tips: [

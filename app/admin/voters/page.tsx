@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { supabase, getErrorMessage, isSupabaseConfigured } from "@/lib/supabase"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import * as XLSX from "xlsx"
 import {
     Users,
@@ -67,6 +68,7 @@ interface ParsedRow {
 }
 
 export default function VotersPage() {
+  const { schoolName, motto, logoUrl } = useSchoolBranding()
   const [voters, setVoters] = useState<Voter[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -547,21 +549,28 @@ export default function VotersPage() {
   // ── Designed PDF export (logo + school header) ────────────────
   const loadLogo = async (): Promise<{ data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null> => {
     try {
-      const res = await fetch("/logo.png")
-      const blob = await res.blob()
-      const data = await new Promise<string>((resolve, reject) => {
-        const fr = new FileReader()
-        fr.onload = () => resolve(fr.result as string)
-        fr.onerror = reject
-        fr.readAsDataURL(blob)
-      })
+      let data = logoUrl
+      let mime = "image/png"
+      if (!logoUrl.startsWith("data:")) {
+        const res = await fetch(logoUrl)
+        const blob = await res.blob()
+        mime = blob.type
+        data = await new Promise<string>((resolve, reject) => {
+          const fr = new FileReader()
+          fr.onload = () => resolve(fr.result as string)
+          fr.onerror = reject
+          fr.readAsDataURL(blob)
+        })
+      } else {
+        mime = logoUrl.substring(5, logoUrl.indexOf(";")) || "image/png"
+      }
       const dims = await new Promise<{ w: number; h: number }>((resolve) => {
         const img = new window.Image()
         img.onload = () => resolve({ w: img.naturalWidth || 100, h: img.naturalHeight || 100 })
         img.onerror = () => resolve({ w: 100, h: 100 })
         img.src = data
       })
-      return { data, fmt: blob.type.includes("png") ? "PNG" : "JPEG", w: dims.w, h: dims.h }
+      return { data, fmt: mime.includes("png") ? "PNG" : "JPEG", w: dims.w, h: dims.h }
     } catch {
       return null
     }
@@ -613,11 +622,11 @@ export default function VotersPage() {
         doc.setTextColor(255, 255, 255)
         doc.setFont("helvetica", "bold")
         doc.setFontSize(15)
-        doc.text("ST. THERESA S.S. BULOBA-KASERO", textX, 34)
+        doc.text(schoolName.toUpperCase(), textX, 34)
         doc.setFont("helvetica", "italic")
         doc.setFontSize(9)
         doc.setTextColor(...gold)
-        doc.text('"Mercy Upon Us"', textX, 50)
+        doc.text(`"${motto}"`, textX, 50)
         doc.setFont("helvetica", "normal")
         doc.setFontSize(11)
         doc.setTextColor(255, 255, 255)
@@ -634,7 +643,7 @@ export default function VotersPage() {
       const drawFooter = (page: number, total: number) => {
         doc.setFontSize(8)
         doc.setTextColor(150, 150, 150)
-        doc.text("St. Theresa S.S. Buloba-Kasero · Royal Ballot Election System", 40, pageH - 24)
+        doc.text(`${schoolName} · Royal Ballot Election System`, 40, pageH - 24)
         doc.text(`Page ${page} of ${total}`, pageW - 40, pageH - 24, { align: "right" })
       }
 

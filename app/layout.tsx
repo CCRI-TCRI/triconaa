@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
+import { SchoolBrandingProvider } from "@/components/school-branding-provider"
 
 export const metadata: Metadata = {
   title: "Royal Ballot - St. Theresa S.S. Buloba-Kasero",
@@ -22,7 +23,9 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
-      <body>{children}</body>
+      <body>
+        <SchoolBrandingProvider>{children}</SchoolBrandingProvider>
+      </body>
     </html>
   )
 }

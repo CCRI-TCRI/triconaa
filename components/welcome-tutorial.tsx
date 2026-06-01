@@ -27,7 +27,7 @@ const tutorialSteps = [
   {
     id: 1,
     title: "Welcome to E-Voting",
-    description: "You're about to participate in the 2025 S3 H Test Elections at St. Theresa S.S. Buloba-Kasero by Unjovu.",
+    description: "You're about to participate in your school's official elections.",
     icon: Vote,
     color: "from-blue-500 to-purple-500",
     content: "This digital voting system ensures your vote is secure, private, and counted accurately.",

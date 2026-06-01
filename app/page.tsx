@@ -13,11 +13,13 @@ import { motion } from "framer-motion"
 import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { userDb } from "@/lib/db"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import { getCurrentSeason, getSeasonalContainerClass } from "@/lib/seasons"
 
 type AppState = "auth" | "tutorial" | "voting" | "complete"
 
 export default function VotingApp() {
+  const { schoolName, logoUrl } = useSchoolBranding()
   const [appState, setAppState] = useState<AppState>("auth")
   const [studentId, setStudentId] = useState("")
   const [studentName, setStudentName] = useState("")
@@ -134,7 +136,7 @@ export default function VotingApp() {
               transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               className="mx-auto w-32 h-32 bg-white rounded-full flex items-center justify-center mb-8 shadow-2xl relative"
             >
-              <img src="/logo.png" alt="St. Theresa S.S. Buloba-Kasero" className="w-20 h-20 object-contain" />
+              <img src={logoUrl} alt={schoolName} className="w-20 h-20 object-contain" />
               <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-white">
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
 import type { Position, Candidate } from "@/lib/db"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import { toast } from "sonner"
 
 interface PositionWithCandidates extends Position {
@@ -35,6 +36,7 @@ interface VotingBallotProps {
 const MAROON = "#7a1f2b"
 
 export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
+  const { schoolName, motto, logoUrl } = useSchoolBranding()
   const [positions, setPositions] = useState<PositionWithCandidates[]>([])
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [votes, setVotes] = useState<Record<string, string>>({})
@@ -174,11 +176,11 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-2 ring-amber-300/50">
-              <img src="/logo.png" alt="St. Theresa S.S." className="h-9 w-9 object-contain" />
+              <img src={logoUrl} alt={schoolName} className="h-9 w-9 object-contain" />
             </div>
             <div className="leading-tight">
-              <h1 className="text-sm font-bold sm:text-base">St. Theresa S.S. Buloba-Kasero</h1>
-              <p className="text-[11px] italic text-amber-200/90">"Mercy Upon Us" · Official Ballot</p>
+              <h1 className="text-sm font-bold sm:text-base">{schoolName}</h1>
+              <p className="text-[11px] italic text-amber-200/90">"{motto}" · Official Ballot</p>
             </div>
           </div>
           <div

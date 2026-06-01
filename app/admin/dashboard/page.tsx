@@ -12,6 +12,7 @@ import {
   Activity, Settings, UserPlus, Tv, CheckCircle2, AlertCircle, Clock,
 } from "lucide-react"
 import { userDb, candidateDb, voteDb, positionDb } from "@/lib/db"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 
 interface DashboardStats {
   totalVoters: number
@@ -69,6 +70,7 @@ const StatCard = ({ title, value, icon: Icon, color, trend, delay = 0 }: any) =>
 )
 
 export default function AdminDashboard() {
+  const { schoolName, logoUrl } = useSchoolBranding()
   const [stats, setStats] = useState<DashboardStats>({ totalVoters: 0, votedCount: 0, totalCandidates: 0, totalVotes: 0 })
   const [postResults, setPostResults] = useState<PostResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -196,11 +198,11 @@ export default function AdminDashboard() {
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-amber-300/40">
-              <img src="/logo.png" alt="St. Theresa S.S." className="h-11 w-11 object-contain" />
+              <img src={logoUrl} alt={schoolName} className="h-11 w-11 object-contain" />
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Election Dashboard</h1>
-              <p className="text-sm text-rose-100/80">St. Theresa S.S. Buloba-Kasero · real-time election data</p>
+              <p className="text-sm text-rose-100/80">{schoolName} · real-time election data</p>
             </div>
           </div>
           <div className="flex items-center gap-3">

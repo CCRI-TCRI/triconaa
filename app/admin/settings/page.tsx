@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,10 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import type { ElectionSettings } from "@/lib/supabase"
-import { Settings, Shield, Palette, Database, Save, RefreshCw } from "lucide-react"
+import { BRANDING_UPDATED_EVENT, DEFAULT_BRANDING } from "@/components/school-branding-provider"
+import { Settings, Shield, Palette, Database, Save, RefreshCw, School, Upload, Trash2, ImageIcon } from "lucide-react"
 
 const DEFAULT_SETTINGS: ElectionSettings = {
   election_name: "2025 Prefectorial Elections",
+  school_name: DEFAULT_BRANDING.schoolName,
+  school_motto: DEFAULT_BRANDING.motto,
+  logo_url: null,
   start_date: new Date().toISOString().split("T")[0],
   end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
   is_active: true,
@@ -94,6 +99,8 @@ export default function SettingsPage() {
         if (error) throw error
         if (data) setSettings(data)
       }
+      // Notify the rest of the site so name/logo update live
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
       toast({ title: "Success", description: "Settings saved successfully" })
     } catch (error: any) {
       console.error("Error saving settings:", error)
@@ -111,6 +118,56 @@ export default function SettingsPage() {
   const updateSetting = (key: keyof ElectionSettings, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }
+
+  // Resize an uploaded image to a small square-ish PNG data URL (kept in the DB)
+  const resizeImage = (file: File, max = 256): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = new window.Image()
+        img.onload = () => {
+          let { width, height } = img
+          if (width > height && width > max) {
+            height = Math.round((height * max) / width)
+            width = max
+          } else if (height > max) {
+            width = Math.round((width * max) / height)
+            height = max
+          }
+          const canvas = document.createElement("canvas")
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext("2d")
+          if (!ctx) return reject(new Error("no canvas context"))
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL("image/png"))
+        }
+        img.onerror = reject
+        img.src = reader.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image file.", variant: "destructive" })
+      return
+    }
+    try {
+      const dataUrl = await resizeImage(file, 256)
+      updateSetting("logo_url", dataUrl)
+      toast({ title: "Logo ready", description: "Click Save Settings to apply it across the site." })
+    } catch {
+      toast({ title: "Error", description: "Could not process that image.", variant: "destructive" })
+    } finally {
+      e.target.value = ""
+    }
+  }
+
+  const removeLogo = () => updateSetting("logo_url", null)
 
   if (loading) {
     return (
@@ -152,13 +209,112 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="school" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="school">School</TabsTrigger>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           <TabsTrigger value="appearance">Appearance</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="school" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <School className="w-5 h-5 text-rose-700" />
+                School Identity
+              </CardTitle>
+              <CardDescription>
+                Set the name, motto and logo of the school holding this election. These appear across the entire
+                site — the voter login, ballot, dashboard, live results and PDF reports.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Logo */}
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-white shadow">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={settings.logo_url || DEFAULT_BRANDING.logoUrl}
+                    alt="School logo preview"
+                    className="h-20 w-20 object-contain"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    School Logo
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    <label className="cursor-pointer">
+                      <div className="inline-flex items-center gap-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-800 transition hover:bg-rose-100">
+                        <Upload className="h-4 w-4" />
+                        Upload Logo
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                    </label>
+                    {settings.logo_url && (
+                      <Button variant="outline" size="sm" onClick={removeLogo} className="text-red-600">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    PNG or JPG. The image is resized automatically. Remove to fall back to the default logo.
+                  </p>
+                </div>
+              </div>
+
+              {/* Name + motto */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="school_name">School Name</Label>
+                  <Input
+                    id="school_name"
+                    value={settings.school_name || ""}
+                    onChange={(e) => updateSetting("school_name", e.target.value)}
+                    placeholder="e.g. St. Theresa S.S. Buloba-Kasero"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="school_motto">School Motto</Label>
+                  <Input
+                    id="school_motto"
+                    value={settings.school_motto || ""}
+                    onChange={(e) => updateSetting("school_motto", e.target.value)}
+                    placeholder="e.g. Mercy Upon Us"
+                  />
+                </div>
+              </div>
+
+              {/* Live preview */}
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Preview</Label>
+                <div className="mt-1.5 flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#5c0f1f] to-[#7a1f2b] p-4 text-white">
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={settings.logo_url || DEFAULT_BRANDING.logoUrl}
+                      alt="preview"
+                      className="h-10 w-10 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-bold leading-tight">{settings.school_name || DEFAULT_BRANDING.schoolName}</p>
+                    <p className="text-xs italic text-amber-200/90">
+                      "{settings.school_motto || DEFAULT_BRANDING.motto}"
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-amber-700">
+                  Remember to click <strong>Save Settings</strong> (top right) to apply changes site-wide.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="general" className="space-y-4">
           <Card>

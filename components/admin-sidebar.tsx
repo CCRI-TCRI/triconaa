@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import {
   Sidebar,
   SidebarContent,
@@ -99,14 +100,17 @@ const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const { schoolName, logoUrl } = useSchoolBranding()
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-4 py-2">
-          <School className="w-8 h-8 text-primary" />
-          <div>
-            <h2 className="text-lg font-semibold">St. Theresa S.S.</h2>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-1 ring-rose-200">
+            <img src={logoUrl} alt={schoolName} className="h-8 w-8 object-contain" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold leading-tight">{schoolName}</h2>
             <p className="text-sm text-muted-foreground">Admin Panel</p>
           </div>
         </div>
