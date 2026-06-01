@@ -9,6 +9,7 @@ import { HolidayPopup } from "@/components/holiday-popup"
 import { SeasonalBackground } from "@/components/seasonal-background"
 import { AdminAccessButton } from "@/components/admin-access-button"
 import { SeasonalIntro } from "@/components/seasonal-intro"
+import { ElectionIntro } from "@/components/election-intro"
 import { motion } from "framer-motion"
 import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,11 +26,15 @@ export default function VotingApp() {
   const [studentName, setStudentName] = useState("")
   const [showTutorial, setShowTutorial] = useState(false)
   const [showHolidayGreeting, setShowHolidayGreeting] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
 
   // Season is driven by the admin Settings (falls back to date-based when "auto")
   const season = getSeasonByTheme(seasonalTheme)
 
   useEffect(() => {
+    // Cinematic intro plays once per browser session
+    if (!sessionStorage.getItem("election-intro-seen")) setShowIntro(true)
+
     const hasSeenTutorial = localStorage.getItem("voting-tutorial-seen")
     if (!hasSeenTutorial) setShowTutorial(true)
 
@@ -91,6 +96,14 @@ export default function VotingApp() {
         <AdminAccessButton />
         {showTutorial && <TutorialPopup onClose={handleTutorialClose} onComplete={handleTutorialPopupComplete} />}
         {showHolidayGreeting && <HolidayPopup onClose={handleHolidayClose} />}
+        {showIntro && (
+          <ElectionIntro
+            onComplete={() => {
+              sessionStorage.setItem("election-intro-seen", "1")
+              setShowIntro(false)
+            }}
+          />
+        )}
       </div>
     )
   }

@@ -19,8 +19,47 @@ interface BiometricAuthProps {
   onAuthSuccess: (studentId: string) => void
 }
 
+// Floating election mascots/decor around the login card
+const DECOR = [
+  { e: "🗳️", left: "6%", top: "16%", dur: 6, d: 0, size: 46 },
+  { e: "✅", left: "88%", top: "20%", dur: 7, d: 0.5, size: 38 },
+  { e: "⭐", left: "12%", top: "74%", dur: 5.5, d: 1, size: 30 },
+  { e: "🎉", left: "84%", top: "70%", dur: 6.5, d: 0.3, size: 40 },
+  { e: "👑", left: "78%", top: "44%", dur: 8, d: 0.8, size: 30 },
+  { e: "📣", left: "8%", top: "46%", dur: 7.5, d: 1.3, size: 32 },
+]
+
+function FestiveDecor() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <motion.div
+        className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl"
+        animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }}
+        transition={{ duration: 7, repeat: Infinity }}
+      />
+      <motion.div
+        className="absolute -right-24 bottom-10 h-72 w-72 rounded-full bg-amber-400/20 blur-3xl"
+        animate={{ scale: [1, 1.25, 1], opacity: [0.35, 0.6, 0.35] }}
+        transition={{ duration: 8, repeat: Infinity, delay: 1 }}
+      />
+      {DECOR.map((f, i) => (
+        <motion.div
+          key={i}
+          className="absolute select-none"
+          style={{ left: f.left, top: f.top, fontSize: f.size }}
+          animate={{ y: [0, -18, 0], rotate: [0, 8, -8, 0], opacity: [0.5, 0.95, 0.5] }}
+          transition={{ duration: f.dur, repeat: Infinity, ease: "easeInOut", delay: f.d }}
+        >
+          {f.e}
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
 export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
   const { schoolName, logoUrl } = useSchoolBranding()
+  const year = new Date().getFullYear()
   const [authMethod, setAuthMethod] = useState<"face" | "manual">("manual")
   const [tokenCode, setTokenCode] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -105,24 +144,45 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-        <Card className="bg-white shadow-2xl border-0">
-          <CardHeader className="text-center space-y-4">
+    <div className="min-h-screen flex items-center justify-center p-4 relative z-10 overflow-hidden">
+      <FestiveDecor />
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 120, damping: 16 }}
+        className="relative w-full max-w-md"
+      >
+        {/* glow ring */}
+        <div className="absolute -inset-3 rounded-3xl bg-gradient-to-r from-blue-500/30 via-amber-400/25 to-indigo-500/30 blur-2xl" />
+        <Card className="relative overflow-hidden border-0 bg-white/95 shadow-2xl backdrop-blur">
+          <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-amber-400 to-indigo-600" />
+          <CardHeader className="text-center space-y-3 pt-6">
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mx-auto w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center shadow-lg border"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="relative mx-auto h-24 w-24"
             >
-              <img src={logoUrl} alt={schoolName} className="w-20 h-20 object-contain" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-100 to-amber-100 shadow-lg" />
+              <motion.div
+                className="absolute -inset-1 rounded-full border-2 border-dashed border-amber-300/60"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img src={logoUrl} alt={schoolName} className="h-20 w-20 object-contain drop-shadow" />
+              </div>
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-800">{schoolName}</CardTitle>
-              <p className="text-gray-600 mt-2">2025 Student OP Polls Elections</p>
-              <Badge variant="secondary" className="mt-2 bg-blue-100 text-blue-800">
-                St. Theresa Royal Ballot by Unjovu
-              </Badge>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: "spring" }}
+                className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full bg-blue-600/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-700"
+              >
+                🗳️ Decision {year}
+              </motion.div>
+              <CardTitle className="text-2xl font-black text-gray-800">{schoolName}</CardTitle>
+              <p className="mt-1 text-gray-600">Student Leadership Elections</p>
             </div>
           </CardHeader>
 
