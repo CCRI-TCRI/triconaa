@@ -118,126 +118,140 @@ export default function ResultsPage() {
       const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
+      const M = 48 // page margin
       const maroon: [number, number, number] = [122, 31, 43]
-      const gold: [number, number, number] = [245, 200, 66]
-      const headerH = 92
+      const ink: [number, number, number] = [33, 37, 41]
+      const muted: [number, number, number] = [120, 120, 120]
+      const line: [number, number, number] = [210, 200, 202]
+      const headerBottom = 96
       const generatedAt = new Date().toLocaleString()
 
       const logo = await loadLogo()
       const totalCandidates = results.reduce((s, r) => s + r.candidates.length, 0)
 
+      // ── Letterhead (every page) ──────────────────────────────
       const drawHeader = () => {
-        doc.setFillColor(...maroon)
-        doc.rect(0, 0, pageW, headerH, "F")
-        doc.setFillColor(...gold)
-        doc.rect(0, headerH, pageW, 3, "F")
-
-        let textX = 40
         if (logo) {
-          const box = 58
-          const cx = 40 + box / 2
-          const cy = headerH / 2
-          doc.setFillColor(255, 255, 255)
-          doc.circle(cx, cy, box / 2 + 3, "F")
+          const box = 50
           const ratio = logo.w / logo.h
           let w = box
           let h = box
           if (ratio > 1) h = box / ratio
           else w = box * ratio
-          doc.addImage(logo.data, logo.fmt, cx - w / 2, cy - h / 2, w, h)
-          textX = 40 + box + 16
+          doc.addImage(logo.data, logo.fmt, M, 28, w, h)
         }
-        doc.setTextColor(255, 255, 255)
+        const tx = M + 62
+        doc.setTextColor(...maroon)
         doc.setFont("helvetica", "bold")
         doc.setFontSize(15)
-        doc.text(schoolName.toUpperCase(), textX, 34)
+        doc.text(schoolName, tx, 44)
         doc.setFont("helvetica", "italic")
         doc.setFontSize(9)
-        doc.setTextColor(...gold)
-        doc.text(`"${motto}"`, textX, 50)
+        doc.setTextColor(...muted)
+        doc.text(`"${motto}"`, tx, 58)
+
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(9)
+        doc.setTextColor(...maroon)
+        doc.text("OFFICIAL ELECTION RESULTS", pageW - M, 42, { align: "right" })
         doc.setFont("helvetica", "normal")
-        doc.setFontSize(11)
-        doc.setTextColor(255, 255, 255)
-        doc.text("Official Election Results", textX, 70)
         doc.setFontSize(8)
-        doc.setTextColor(255, 230, 230)
-        doc.text(`Generated: ${generatedAt}`, pageW - 40, 34, { align: "right" })
+        doc.setTextColor(...muted)
+        doc.text(generatedAt, pageW - M, 56, { align: "right" })
+
+        // rule
+        doc.setDrawColor(...maroon)
+        doc.setLineWidth(1.2)
+        doc.line(M, 74, pageW - M, 74)
+        doc.setDrawColor(245, 200, 66)
+        doc.setLineWidth(0.6)
+        doc.line(M, 77, pageW - M, 77)
       }
 
       const drawFooter = (page: number, total: number) => {
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`${schoolName} · Royal Ballot Election System`, 40, pageH - 24)
-        doc.text(`Page ${page} of ${total}`, pageW - 40, pageH - 24, { align: "right" })
+        doc.setDrawColor(...line)
+        doc.setLineWidth(0.5)
+        doc.line(M, pageH - 34, pageW - M, pageH - 34)
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(7.5)
+        doc.setTextColor(...muted)
+        doc.text(`${schoolName} · Royal Ballot Election System`, M, pageH - 22)
+        doc.text("CONFIDENTIAL", pageW / 2, pageH - 22, { align: "center" })
+        doc.text(`Page ${page} of ${total}`, pageW - M, pageH - 22, { align: "right" })
       }
 
-      // Summary block (drawn once, below the header on page 1)
+      // ── Summary panel (page 1) ───────────────────────────────
       const drawSummary = () => {
-        const top = headerH + 22
-        const boxW = (pageW - 80 - 24) / 3
+        const top = headerBottom + 6
+        doc.setFont("helvetica", "bold")
+        doc.setFontSize(11)
+        doc.setTextColor(...ink)
+        doc.text("Results Summary", M, top + 4)
+
+        const boxTop = top + 14
+        const panelW = pageW - M * 2
+        const colW = panelW / 3
         const stats = [
           { label: "Registered Voters", value: String(totalVoters) },
           { label: "Votes Cast", value: String(totalVotes) },
           { label: "Voter Turnout", value: `${turnout.toFixed(1)}%` },
         ]
+        doc.setDrawColor(...line)
+        doc.setLineWidth(0.8)
+        doc.roundedRect(M, boxTop, panelW, 58, 4, 4, "S")
         stats.forEach((s, i) => {
-          const x = 40 + i * (boxW + 12)
-          doc.setFillColor(250, 244, 246)
-          doc.roundedRect(x, top, boxW, 52, 6, 6, "F")
-          doc.setDrawColor(230, 210, 215)
-          doc.roundedRect(x, top, boxW, 52, 6, 6, "S")
-          doc.setTextColor(120, 120, 120)
+          const x = M + i * colW
+          if (i > 0) {
+            doc.setDrawColor(...line)
+            doc.setLineWidth(0.5)
+            doc.line(x, boxTop + 10, x, boxTop + 48)
+          }
           doc.setFont("helvetica", "normal")
           doc.setFontSize(8)
-          doc.text(s.label.toUpperCase(), x + 12, top + 18)
-          doc.setTextColor(...maroon)
+          doc.setTextColor(...muted)
+          doc.text(s.label.toUpperCase(), x + 16, boxTop + 24)
           doc.setFont("helvetica", "bold")
           doc.setFontSize(20)
-          doc.text(s.value, x + 12, top + 42)
+          doc.setTextColor(...maroon)
+          doc.text(s.value, x + 16, boxTop + 46)
         })
 
-        // turnout progress bar
-        const barY = top + 66
-        const barW = pageW - 80
-        doc.setTextColor(90, 90, 90)
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(9)
-        doc.text("Voter Turnout", 40, barY)
-        doc.text(`${votedCount} / ${totalVoters} voted`, pageW - 40, barY, { align: "right" })
-        doc.setFillColor(235, 228, 230)
-        doc.roundedRect(40, barY + 6, barW, 12, 6, 6, "F")
-        doc.setFillColor(...maroon)
-        const fillW = Math.max(2, (barW * turnout) / 100)
-        doc.roundedRect(40, barY + 6, fillW, 12, 6, 6, "F")
-
-        doc.setTextColor(120, 120, 120)
+        // turnout bar
+        const barY = boxTop + 74
         doc.setFont("helvetica", "normal")
         doc.setFontSize(8)
-        doc.text(`${results.length} positions · ${totalCandidates} candidates`, 40, barY + 36)
-        return barY + 48 // bottom y
+        doc.setTextColor(...muted)
+        doc.text(`Turnout — ${votedCount} of ${totalVoters} students voted`, M, barY)
+        doc.text(`${results.length} positions · ${totalCandidates} candidates`, pageW - M, barY, { align: "right" })
+        const barW = panelW
+        doc.setFillColor(236, 230, 231)
+        doc.roundedRect(M, barY + 6, barW, 9, 4, 4, "F")
+        doc.setFillColor(...maroon)
+        doc.roundedRect(M, barY + 6, Math.max(2, (barW * turnout) / 100), 9, 4, 4, "F")
+        return barY + 28
       }
 
-      // Build a single grouped table: a position header row, then its candidates
+      // ── Grouped results table ────────────────────────────────
       const body: any[] = []
       const winnerRows = new Set<number>()
       results.forEach((pos) => {
         body.push([
           {
-            content: `${pos.position_name.toUpperCase()}   ·   ${pos.category}   ·   ${pos.total_votes} vote${pos.total_votes === 1 ? "" : "s"}`,
+            content: `${pos.position_name.toUpperCase()}    ${pos.category} · ${pos.total_votes} vote${pos.total_votes === 1 ? "" : "s"}`,
             colSpan: 4,
-            styles: { fillColor: maroon, textColor: 255, fontStyle: "bold", fontSize: 10, halign: "left", cellPadding: 6 },
+            styles: { fillColor: maroon, textColor: 255, fontStyle: "bold", fontSize: 9.5, halign: "left", cellPadding: 5 },
           },
         ])
         if (pos.candidates.length === 0) {
-          body.push([{ content: "No candidates registered", colSpan: 4, styles: { textColor: [150, 150, 150], halign: "center", fontStyle: "italic" } }])
+          body.push([{ content: "No candidates registered", colSpan: 4, styles: { textColor: muted, halign: "center", fontStyle: "italic" } }])
           return
         }
         pos.candidates.forEach((c, i) => {
           const isWinner = i === 0 && c.vote_count > 0
           if (isWinner) winnerRows.add(body.length)
           body.push([
-            isWinner ? "WINNER" : String(i + 1),
-            c.full_name + (c.class ? `  (${c.class})` : ""),
+            isWinner ? "WIN" : String(i + 1),
+            c.full_name + (c.class ? `   ${c.class}` : ""),
             String(c.vote_count),
             `${c.percentage.toFixed(1)}%`,
           ])
@@ -249,25 +263,67 @@ export default function ResultsPage() {
       autoTable(doc, {
         head: [["#", "Candidate", "Votes", "Share"]],
         body,
-        startY: summaryBottom + 12,
-        margin: { top: headerH + 16, left: 40, right: 40, bottom: 40 },
-        styles: { fontSize: 10, cellPadding: 6, overflow: "linebreak" },
-        headStyles: { fillColor: [60, 10, 20], textColor: 255, fontStyle: "bold" },
+        theme: "grid",
+        startY: summaryBottom,
+        margin: { top: headerBottom, left: M, right: M, bottom: 46 },
+        styles: { fontSize: 9.5, cellPadding: 6, lineColor: line, lineWidth: 0.5, textColor: ink },
+        headStyles: { fillColor: [245, 240, 241], textColor: maroon, fontStyle: "bold", lineColor: line, lineWidth: 0.5 },
+        alternateRowStyles: { fillColor: [250, 249, 249] },
         columnStyles: {
-          0: { cellWidth: 60, halign: "center" },
-          2: { cellWidth: 70, halign: "center", fontStyle: "bold" },
-          3: { cellWidth: 70, halign: "center" },
+          0: { cellWidth: 50, halign: "center", textColor: muted },
+          2: { cellWidth: 72, halign: "center", fontStyle: "bold" },
+          3: { cellWidth: 72, halign: "center" },
         },
         didParseCell: (data) => {
           if (data.section === "body" && winnerRows.has(data.row.index)) {
-            data.cell.styles.fillColor = [255, 247, 224]
-            data.cell.styles.textColor = [122, 31, 43]
+            data.cell.styles.fillColor = [255, 248, 230]
+            data.cell.styles.textColor = maroon
             data.cell.styles.fontStyle = "bold"
           }
         },
         didDrawPage: () => {
           drawHeader()
         },
+      })
+
+      // ── Declaration / sign-off ───────────────────────────────
+      let y = (doc as any).lastAutoTable.finalY + 34
+      if (y + 120 > pageH - 50) {
+        doc.addPage()
+        drawHeader()
+        y = headerBottom + 10
+      }
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(10)
+      doc.setTextColor(...maroon)
+      doc.text("RESULT DECLARATION", M, y)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(9)
+      doc.setTextColor(...ink)
+      doc.text(
+        "We certify that the figures above are a true and accurate tally of the votes cast in this election.",
+        M,
+        y + 16,
+        { maxWidth: pageW - M * 2 },
+      )
+
+      const sigY = y + 64
+      const colGap = 40
+      const sigW = (pageW - M * 2 - colGap) / 2
+      ;[
+        { label: "Returning Officer", x: M },
+        { label: "Witness", x: M + sigW + colGap },
+      ].forEach((s) => {
+        doc.setDrawColor(...ink)
+        doc.setLineWidth(0.6)
+        doc.line(s.x, sigY, s.x + sigW, sigY)
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(8)
+        doc.setTextColor(...muted)
+        doc.text(`${s.label} — Name & Signature`, s.x, sigY + 12)
+        // date line
+        doc.line(s.x, sigY + 36, s.x + sigW, sigY + 36)
+        doc.text("Date", s.x, sigY + 48)
       })
 
       const pageCount = (doc as any).getNumberOfPages()
