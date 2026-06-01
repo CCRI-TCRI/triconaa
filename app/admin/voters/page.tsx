@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { supabase, getErrorMessage, isSupabaseConfigured } from "@/lib/supabase"
+import * as XLSX from "xlsx"
 import {
     Users,
     UserPlus,
@@ -37,6 +40,10 @@ import {
     Key,
     Edit,
     AlertTriangle,
+    Upload,
+    FileSpreadsheet,
+    FileText,
+    X,
   } from "lucide-react"
 
 interface Voter {
@@ -48,6 +55,14 @@ interface Voter {
   has_voted: boolean
   created_at: string
   voted_at?: string
+}
+
+interface ParsedRow {
+  full_name: string
+  student_id: string
+  class: string
+  valid: boolean
+  note?: string
 }
 
 export default function VotersPage() {
@@ -73,6 +88,14 @@ export default function VotersPage() {
     pending: 0,
     turnout: 0,
   })
+
+  // Bulk import state
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importText, setImportText] = useState("")
+  const [importFileName, setImportFileName] = useState("")
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
+  const [importProgress, setImportProgress] = useState(0)
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -113,6 +136,184 @@ export default function VotersPage() {
 
   const generateVotingCode = () => {
     return "VT" + Math.random().toString(36).substring(2, 8).toUpperCase()
+  }
+
+  // ── Bulk import helpers ───────────────────────────────────────
+  // Turn a raw matrix of cells (from a file or pasted text) into validated rows.
+  const rowsToParsed = (matrix: any[][]): ParsedRow[] => {
+    const cleaned = matrix
+      .map((r) => (Array.isArray(r) ? r.map((c) => (c == null ? "" : String(c).trim())) : [String(r).trim()]))
+      .filter((r) => r.some((c) => c !== ""))
+    if (cleaned.length === 0) return []
+
+    const header = cleaned[0].map((c) => c.toLowerCase())
+    const hasHeader = header.some(
+      (h) => h.includes("name") || h.includes("student") || h.includes("class") || h.includes("stream"),
+    )
+
+    let nameIdx = 0
+    let idIdx = -1
+    let classIdx = -1
+    let dataRows = cleaned
+
+    if (hasHeader) {
+      nameIdx = header.findIndex((h) => h.includes("name"))
+      idIdx = header.findIndex(
+        (h) => h.includes("student") || h.includes("reg") || h.includes("index") || h.includes("adm") || h.includes("number") || h === "id",
+      )
+      classIdx = header.findIndex((h) => h.includes("class") || h.includes("stream") || h.includes("form"))
+      if (nameIdx === -1) nameIdx = 0
+      dataRows = cleaned.slice(1)
+    } else {
+      // Positional: [name, student id, class]
+      const width = cleaned[0].length
+      idIdx = width > 1 ? 1 : -1
+      classIdx = width > 2 ? 2 : -1
+    }
+
+    return dataRows.map((r) => {
+      const full_name = (r[nameIdx] || "").trim()
+      const student_id = idIdx >= 0 ? (r[idIdx] || "").trim() : ""
+      const cls = classIdx >= 0 ? (r[classIdx] || "").trim() : ""
+      const valid = full_name.length > 0
+      return { full_name, student_id, class: cls, valid, note: valid ? undefined : "Missing name — will be skipped" }
+    })
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportFileName(file.name)
+    setImportText("")
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: "array" })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const matrix = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, raw: false, defval: "" })
+      const rows = rowsToParsed(matrix)
+      setParsedRows(rows)
+      if (rows.length === 0) {
+        toast({ title: "No rows found", description: "The file appears to be empty.", variant: "destructive" })
+      }
+    } catch (err) {
+      console.error("Error parsing file:", err)
+      toast({ title: "Error", description: "Could not read that file. Use .csv, .xlsx or .xls.", variant: "destructive" })
+    } finally {
+      e.target.value = "" // allow re-uploading the same file
+    }
+  }
+
+  const handleImportTextChange = (value: string) => {
+    setImportText(value)
+    setImportFileName("")
+    const matrix = value
+      .split(/\r?\n/)
+      .map((line) => (line.includes("\t") ? line.split("\t") : line.includes(",") ? line.split(",") : [line]))
+    setParsedRows(value.trim() ? rowsToParsed(matrix) : [])
+  }
+
+  const clearImport = () => {
+    setParsedRows([])
+    setImportText("")
+    setImportFileName("")
+    setImportProgress(0)
+  }
+
+  const downloadTemplate = () => {
+    const csv = "Full Name,Student ID,Class\nJohn Doe,STH00001,S1A\nJane Smith,,S2B\n"
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "voters-import-template.csv"
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const runImport = async () => {
+    const validRows = parsedRows.filter((r) => r.valid)
+    if (validRows.length === 0) {
+      toast({ title: "Nothing to import", description: "No valid names were found.", variant: "destructive" })
+      return
+    }
+
+    setImporting(true)
+    setImportProgress(0)
+    try {
+      const usedIds = new Set(voters.map((v) => v.student_id))
+      const usedCodes = new Set(voters.map((v) => v.voting_code))
+      let seq = 1
+      const genId = () => {
+        let id: string
+        do {
+          id = "STH" + String(seq++).padStart(5, "0")
+        } while (usedIds.has(id))
+        usedIds.add(id)
+        return id
+      }
+      const genCode = () => {
+        let c: string
+        do {
+          c = generateVotingCode()
+        } while (usedCodes.has(c))
+        usedCodes.add(c)
+        return c
+      }
+
+      const toInsert: any[] = []
+      let skipped = 0
+      for (const r of validRows) {
+        let sid = r.student_id
+        if (sid) {
+          if (usedIds.has(sid)) {
+            skipped++
+            continue // duplicate student ID — skip
+          }
+          usedIds.add(sid)
+        } else {
+          sid = genId()
+        }
+        toInsert.push({
+          student_id: sid,
+          full_name: r.full_name,
+          class: r.class || "N/A",
+          voting_code: genCode(),
+          has_voted: false,
+        })
+      }
+
+      const chunkSize = 200
+      let inserted = 0
+      let failed = 0
+      for (let i = 0; i < toInsert.length; i += chunkSize) {
+        const chunk = toInsert.slice(i, i + chunkSize)
+        const { error } = await supabase.from("users").insert(chunk)
+        if (error) {
+          console.error("Bulk insert error:", getErrorMessage(error))
+          failed += chunk.length
+        } else {
+          inserted += chunk.length
+        }
+        setImportProgress(Math.round(((i + chunk.length) / toInsert.length) * 100))
+      }
+
+      await fetchVoters()
+      toast({
+        title: "Import complete",
+        description:
+          `${inserted} voter${inserted === 1 ? "" : "s"} added` +
+          (skipped ? `, ${skipped} duplicate ID${skipped === 1 ? "" : "s"} skipped` : "") +
+          (failed ? `, ${failed} failed` : ""),
+        variant: failed ? "destructive" : undefined,
+      })
+      clearImport()
+      setShowImportDialog(false)
+    } catch (error) {
+      console.error("Error importing voters:", error)
+      toast({ title: "Error", description: "Failed to import voters.", variant: "destructive" })
+    } finally {
+      setImporting(false)
+    }
   }
 
   const addVoter = async () => {
@@ -331,7 +532,7 @@ export default function VotersPage() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `lubiri-voters-${new Date().toISOString().split("T")[0]}.csv`
+    a.download = `st-theresa-voters-${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
 
@@ -375,6 +576,155 @@ export default function VotersPage() {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
+          <Dialog
+            open={showImportDialog}
+            onOpenChange={(open) => {
+              setShowImportDialog(open)
+              if (!open) clearImport()
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={saving}>
+                <Upload className="w-4 h-4 mr-2" />
+                Bulk Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-rose-700" />
+                  Bulk Import Voters
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Upload a <strong>CSV / Excel</strong> file or paste a list of names. Only the{" "}
+                  <strong>Full Name</strong> is required — Student ID and Class are filled automatically when missing.
+                  Each voter gets a unique voting code.
+                </p>
+
+                {/* File upload */}
+                <div>
+                  <Label>Upload file (.csv, .xlsx, .xls)</Label>
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <label className="flex-1 cursor-pointer">
+                      <div className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-rose-200 bg-rose-50/50 px-4 py-6 text-center transition hover:border-rose-400 hover:bg-rose-50">
+                        <Upload className="h-5 w-5 text-rose-600" />
+                        <span className="text-sm font-medium text-rose-800">
+                          {importFileName || "Choose a CSV or Excel file"}
+                        </span>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                        className="hidden"
+                        onChange={handleImportFile}
+                      />
+                    </label>
+                  </div>
+                  <button onClick={downloadTemplate} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-rose-700 hover:underline">
+                    <FileText className="h-3 w-3" />
+                    Download template
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-muted-foreground">
+                  <div className="h-px flex-1 bg-border" />
+                  or paste names
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                {/* Paste area */}
+                <div>
+                  <Label htmlFor="paste-names">Paste names (one per line)</Label>
+                  <Textarea
+                    id="paste-names"
+                    value={importText}
+                    onChange={(e) => handleImportTextChange(e.target.value)}
+                    placeholder={"John Doe\nJane Smith, STH00002, S2B\nPeter Okello"}
+                    rows={6}
+                    className="mt-1.5 font-mono text-sm"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Tip: you can also paste comma- or tab-separated columns as “Name, Student ID, Class”.
+                  </p>
+                </div>
+
+                {/* Preview */}
+                {parsedRows.length > 0 && (
+                  <div className="rounded-lg border">
+                    <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2 text-sm">
+                      <span className="font-medium">
+                        {parsedRows.filter((r) => r.valid).length} valid
+                        {parsedRows.some((r) => !r.valid) && (
+                          <span className="text-amber-600">
+                            {" "}
+                            · {parsedRows.filter((r) => !r.valid).length} skipped
+                          </span>
+                        )}
+                      </span>
+                      <button onClick={clearImport} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                        <X className="h-3 w-3" />
+                        Clear
+                      </button>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="h-8">Full Name</TableHead>
+                            <TableHead className="h-8">Student ID</TableHead>
+                            <TableHead className="h-8">Class</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {parsedRows.slice(0, 100).map((r, i) => (
+                            <TableRow key={i} className={r.valid ? "" : "opacity-50"}>
+                              <TableCell className="py-1.5">{r.full_name || <span className="text-amber-600">— missing —</span>}</TableCell>
+                              <TableCell className="py-1.5 text-muted-foreground">{r.student_id || "auto"}</TableCell>
+                              <TableCell className="py-1.5 text-muted-foreground">{r.class || "N/A"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {parsedRows.length > 100 && (
+                        <p className="px-3 py-2 text-center text-xs text-muted-foreground">
+                          …and {parsedRows.length - 100} more
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {importing && (
+                  <div>
+                    <Progress value={importProgress} className="h-2" />
+                    <p className="mt-1 text-center text-xs text-muted-foreground">Importing… {importProgress}%</p>
+                  </div>
+                )}
+
+                <Button
+                  onClick={runImport}
+                  className="w-full bg-[#7a1f2b] text-white hover:bg-[#5c0f1f]"
+                  disabled={importing || parsedRows.filter((r) => r.valid).length === 0}
+                >
+                  {importing ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Importing…
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Import {parsedRows.filter((r) => r.valid).length || ""} Voter
+                      {parsedRows.filter((r) => r.valid).length === 1 ? "" : "s"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button disabled={saving}>
