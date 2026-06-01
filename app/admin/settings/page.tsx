@@ -35,10 +35,12 @@ const DEFAULT_SETTINGS: ElectionSettings = {
 }
 
 const seasonalThemes = [
-  { value: "default", label: "Default" },
+  { value: "auto", label: "Automatic (by date)" },
+  { value: "default", label: "Default (Blue)" },
   { value: "halloween", label: "Halloween" },
   { value: "christmas", label: "Christmas" },
-  { value: "july4th", label: "July 4th" },
+  { value: "newyear", label: "New Year" },
+  { value: "fourth-of-july", label: "Independence Day" },
   { value: "valentine", label: "Valentine's Day" },
   { value: "pride", label: "Pride Month" },
 ]
@@ -386,6 +388,10 @@ export default function SettingsPage() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{seasonalThemes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
                 </Select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Controls the voter-facing background, intro animation and holiday greeting across the site.
+                  Choose <strong>Automatic</strong> to switch themes by calendar date. Save to apply.
+                </p>
               </div>
               <div>
                 <Label htmlFor="custom_greeting">Custom Greeting Message</Label>

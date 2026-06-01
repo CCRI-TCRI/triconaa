@@ -26,9 +26,9 @@ interface PositionResult {
   candidates: Candidate[] // sorted desc by vote_count
 }
 
-// Professional, election-board colour palette
-const PALETTE = ["#3b82f6", "#0ea5e9", "#14b8a6", "#6366f1", "#8b5cf6", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#a855f7"]
-const LEADER_COLOR = "#f59e0b"
+// White & blue professional palette
+const BLUE_PALETTE = ["#2563eb", "#3b82f6", "#0ea5e9", "#0284c7", "#38bdf8", "#60a5fa", "#6366f1", "#1d4ed8"]
+const LEADER_COLOR = "#1e3a8a" // navy — stands out among the blues
 
 const initials = (name: string) =>
   name
@@ -116,15 +116,15 @@ export default function LiveResultsPage() {
 
   if (loading || results.length === 0) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-950">
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-white to-blue-50">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="mx-auto mb-5 h-16 w-16 rounded-full border-4 border-slate-700 border-t-sky-400"
+            className="mx-auto mb-5 h-16 w-16 rounded-full border-4 border-blue-100 border-t-blue-600"
           />
-          <p className="text-2xl font-bold tracking-tight text-white">{schoolName}</p>
-          <p className="mt-2 text-slate-400">Loading live election results…</p>
+          <p className="text-2xl font-bold tracking-tight text-blue-900">{schoolName}</p>
+          <p className="mt-2 text-slate-500">Loading live election results…</p>
         </motion.div>
       </div>
     )
@@ -138,59 +138,60 @@ export default function LiveResultsPage() {
     name: c.full_name.split(" ")[0],
     fullName: c.full_name,
     votes: c.vote_count,
-    fill: i === 0 && c.vote_count > 0 ? LEADER_COLOR : PALETTE[i % PALETTE.length],
+    fill: i === 0 && c.vote_count > 0 ? LEADER_COLOR : BLUE_PALETTE[i % BLUE_PALETTE.length],
   }))
 
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-white via-blue-50 to-slate-100 text-slate-900">
       {/* ── Header ─────────────────────────────────────────── */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur">
+      <header className="border-b border-blue-100 bg-white/90 backdrop-blur">
         <div className="flex items-center justify-between px-8 py-4">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg">
+            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-1 ring-blue-100">
               <img src={logoUrl} alt={schoolName} className="h-10 w-10 object-contain" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight sm:text-xl">{schoolName}</h1>
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-sky-400">Live Election Results</p>
+              <h1 className="text-lg font-bold leading-tight text-blue-900 sm:text-xl">{schoolName}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Live Election Results</p>
             </div>
           </div>
           <div className="flex items-center gap-5">
-            <span className="hidden font-mono text-sm text-slate-400 sm:inline">{clock}</span>
-            <div className="flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 ring-1 ring-emerald-500/30">
+            <span className="hidden font-mono text-sm text-slate-500 sm:inline">{clock}</span>
+            <div className="flex items-center gap-2 rounded-full bg-blue-600 px-3 py-1.5 shadow-sm">
               <motion.span
                 animate={{ opacity: [1, 0.3, 1] }}
                 transition={{ duration: 1.4, repeat: Infinity }}
-                className="h-2.5 w-2.5 rounded-full bg-emerald-400"
+                className="h-2.5 w-2.5 rounded-full bg-white"
               />
-              <span className="text-sm font-bold uppercase tracking-widest text-emerald-300">Live</span>
+              <span className="text-sm font-bold uppercase tracking-widest text-white">Live</span>
             </div>
           </div>
         </div>
-        {/* accent line */}
-        <div className="h-0.5 bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500" />
+        <div className="h-1 bg-gradient-to-r from-blue-700 via-blue-500 to-sky-400" />
       </header>
 
       {/* ── Stats strip ────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-px bg-slate-800 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 px-8 py-3 sm:grid-cols-4">
         {[
-          { label: "Votes Counted", value: analytics.totalVotes.toLocaleString(), icon: BarChart3, color: "text-sky-400" },
-          { label: "Turnout", value: `${analytics.turnout.toFixed(1)}%`, icon: TrendingUp, color: "text-emerald-400" },
-          { label: "Students Voted", value: `${analytics.votedCount}/${analytics.totalVoters}`, icon: Users, color: "text-indigo-400" },
-          { label: "Races Reporting", value: `${analytics.reporting}/${analytics.totalPositions}`, icon: CheckCircle2, color: "text-amber-400" },
+          { label: "Votes Counted", value: analytics.totalVotes.toLocaleString(), icon: BarChart3 },
+          { label: "Turnout", value: `${analytics.turnout.toFixed(1)}%`, icon: TrendingUp },
+          { label: "Students Voted", value: `${analytics.votedCount}/${analytics.totalVoters}`, icon: Users },
+          { label: "Races Reporting", value: `${analytics.reporting}/${analytics.totalPositions}`, icon: CheckCircle2 },
         ].map((item) => (
-          <div key={item.label} className="flex items-center gap-3 bg-slate-900 px-6 py-3">
-            <item.icon className={`h-5 w-5 ${item.color}`} />
+          <div key={item.label} className="flex items-center gap-3 rounded-xl border border-blue-100 bg-white px-5 py-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+              <item.icon className="h-5 w-5 text-blue-600" />
+            </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">{item.label}</p>
-              <p className="text-xl font-bold tabular-nums sm:text-2xl">{item.value}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{item.label}</p>
+              <p className="text-xl font-bold tabular-nums text-blue-900 sm:text-2xl">{item.value}</p>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Slide ──────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col overflow-hidden px-8 py-5">
+      <div className="flex flex-1 flex-col overflow-hidden px-8 pb-3">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -201,58 +202,59 @@ export default function LiveResultsPage() {
             className="flex flex-1 flex-col overflow-hidden"
           >
             {/* Position header */}
-            <div className="mb-4 flex items-end justify-between">
+            <div className="mb-3 flex items-end justify-between border-b border-blue-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-sky-400">{current.category}</p>
-                <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{current.position_name}</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-blue-600">{current.category}</p>
+                <h2 className="text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">{current.position_name}</h2>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-black tabular-nums text-white sm:text-4xl">{current.total_votes}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">Total Votes</p>
+                <p className="text-3xl font-black tabular-nums text-blue-700 sm:text-4xl">{current.total_votes}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Total Votes</p>
               </div>
             </div>
 
             <div className="grid flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-5">
-              {/* Leaderboard */}
+              {/* Leaderboard with candidate photos */}
               <div className="flex flex-col gap-2.5 overflow-y-auto lg:col-span-3">
                 {current.candidates.map((candidate, idx) => {
                   const pct = current.total_votes > 0 ? (candidate.vote_count / current.total_votes) * 100 : 0
                   const isLeader = idx === 0 && candidate.vote_count > 0
-                  const color = isLeader ? LEADER_COLOR : PALETTE[idx % PALETTE.length]
+                  const color = isLeader ? LEADER_COLOR : BLUE_PALETTE[idx % BLUE_PALETTE.length]
                   return (
                     <motion.div
                       key={candidate.id}
                       initial={{ opacity: 0, x: -24 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.06 }}
-                      className={`flex items-center gap-4 rounded-xl border px-4 py-3 ${
-                        isLeader ? "border-amber-500/40 bg-amber-500/10" : "border-slate-800 bg-slate-900/60"
+                      className={`flex items-center gap-4 rounded-xl border bg-white px-4 py-3 shadow-sm ${
+                        isLeader ? "border-blue-300 ring-1 ring-blue-200" : "border-slate-100"
                       }`}
                     >
-                      <span className="w-5 text-center text-lg font-black tabular-nums text-slate-500">{idx + 1}</span>
+                      <span className="w-5 text-center text-lg font-black tabular-nums text-slate-300">{idx + 1}</span>
+                      {/* candidate image */}
                       <div
-                        className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2"
+                        className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 bg-blue-50"
                         style={{ borderColor: color }}
                       >
                         {candidate.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={candidate.photo_url} alt={candidate.full_name} className="h-full w-full object-cover" />
                         ) : (
-                          <span className="text-sm font-bold text-slate-200">{initials(candidate.full_name)}</span>
+                          <span className="text-base font-bold text-blue-700">{initials(candidate.full_name)}</span>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="mb-1.5 flex items-center gap-2">
-                          <p className="truncate text-base font-bold sm:text-lg">{candidate.full_name}</p>
-                          <span className="truncate text-xs text-slate-500">{candidate.class}</span>
+                          <p className="truncate text-base font-bold text-slate-900 sm:text-lg">{candidate.full_name}</p>
+                          <span className="truncate text-xs text-slate-400">{candidate.class}</span>
                           {isLeader && (
-                            <span className="ml-1 flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-300">
+                            <span className="ml-1 flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white">
                               <Crown className="h-3 w-3" />
                               Leading
                             </span>
                           )}
                         </div>
-                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${pct}%` }}
@@ -263,8 +265,8 @@ export default function LiveResultsPage() {
                         </div>
                       </div>
                       <div className="w-20 text-right">
-                        <p className="text-xl font-black tabular-nums">{pct.toFixed(1)}%</p>
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                        <p className="text-xl font-black tabular-nums text-blue-900">{pct.toFixed(1)}%</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                           {candidate.vote_count} vote{candidate.vote_count === 1 ? "" : "s"}
                         </p>
                       </div>
@@ -275,18 +277,18 @@ export default function LiveResultsPage() {
 
               {/* Charts */}
               <div className="flex flex-col gap-4 overflow-hidden lg:col-span-2">
-                {/* Bar chart: votes per candidate */}
-                <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Votes by Candidate</p>
+                {/* Bar chart */}
+                <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Votes by Candidate</p>
                   <div className="min-h-0 flex-1">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                        <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={{ stroke: "#334155" }} tickLine={false} />
-                        <YAxis allowDecimals={false} tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} axisLine={{ stroke: "#cbd5e1" }} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
                         <Tooltip
-                          cursor={{ fill: "rgba(148,163,184,0.08)" }}
-                          contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#fff" }}
+                          cursor={{ fill: "rgba(37,99,235,0.06)" }}
+                          contentStyle={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 8, color: "#1e293b" }}
                           formatter={(value: any) => [`${value} votes`, "Votes"]}
                           labelFormatter={(label: any, payload: any) => payload?.[0]?.payload?.fullName || label}
                         />
@@ -300,9 +302,9 @@ export default function LiveResultsPage() {
                   </div>
                 </div>
 
-                {/* Donut: vote share */}
-                <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">Vote Share</p>
+                {/* Donut */}
+                <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500">Vote Share</p>
                   <div className="relative min-h-0 flex-1">
                     {current.total_votes > 0 ? (
                       <>
@@ -322,18 +324,18 @@ export default function LiveResultsPage() {
                               ))}
                             </Pie>
                             <Tooltip
-                              contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#fff" }}
+                              contentStyle={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 8, color: "#1e293b" }}
                               formatter={(value: any, _n: any, p: any) => [`${value} votes`, p?.payload?.fullName]}
                             />
                           </PieChart>
                         </ResponsiveContainer>
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-2xl font-black tabular-nums">{current.total_votes}</span>
-                          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">votes</span>
+                          <span className="text-2xl font-black tabular-nums text-blue-900">{current.total_votes}</span>
+                          <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">votes</span>
                         </div>
                       </>
                     ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                      <div className="flex h-full items-center justify-center text-sm text-slate-400">
                         Awaiting first votes…
                       </div>
                     )}
@@ -343,16 +345,16 @@ export default function LiveResultsPage() {
             </div>
 
             {/* Projection + slideshow controls */}
-            <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-3">
-              <p className="text-sm font-semibold text-slate-400">
+            <div className="mt-3 flex items-center justify-between border-t border-blue-100 pt-3">
+              <p className="text-sm font-semibold text-slate-500">
                 {leader && leader.vote_count > 0 ? (
                   <>
-                    <span className="font-black text-amber-400">PROJECTED LEADER:</span>{" "}
-                    <span className="text-white">{leader.full_name}</span>
-                    <span className="text-slate-500"> · {leader.vote_count} votes</span>
+                    <span className="font-black text-blue-700">PROJECTED LEADER:</span>{" "}
+                    <span className="text-slate-900">{leader.full_name}</span>
+                    <span className="text-slate-400"> · {leader.vote_count} votes</span>
                   </>
                 ) : (
-                  <span className="text-slate-500">Awaiting first votes in this race…</span>
+                  <span className="text-slate-400">Awaiting first votes in this race…</span>
                 )}
               </p>
               <div className="flex items-center gap-4">
@@ -362,12 +364,12 @@ export default function LiveResultsPage() {
                       key={index}
                       onClick={() => setCurrentIndex(index)}
                       className={`h-1.5 rounded-full transition-all ${
-                        index === currentIndex ? "w-8 bg-sky-400" : "w-1.5 bg-slate-700 hover:bg-slate-600"
+                        index === currentIndex ? "w-8 bg-blue-600" : "w-1.5 bg-slate-300 hover:bg-slate-400"
                       }`}
                     />
                   ))}
                 </div>
-                <p className="text-xs font-semibold text-slate-500">
+                <p className="text-xs font-semibold text-slate-400">
                   Race {currentIndex + 1}/{results.length} · next in {timeUntilNext}s
                 </p>
               </div>
@@ -377,9 +379,9 @@ export default function LiveResultsPage() {
       </div>
 
       {/* ── Footer ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-t border-slate-800 bg-slate-900/60 px-8 py-2.5">
-        <p className="text-xs text-slate-500">{schoolName} · Live election coverage</p>
-        <p className="text-xs text-slate-500">Auto-updating every 5 seconds</p>
+      <div className="flex items-center justify-between border-t border-blue-100 bg-white/90 px-8 py-2.5">
+        <p className="text-xs text-slate-400">{schoolName} · Live election coverage</p>
+        <p className="text-xs text-slate-400">Auto-updating every 5 seconds</p>
       </div>
     </div>
   )

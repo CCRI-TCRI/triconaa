@@ -2,28 +2,25 @@
 
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { getCurrentSeason } from "@/lib/seasons"
+import { getSeasonByTheme } from "@/lib/seasons"
 
-export function SeasonalIntro() {
-  const [season, setSeason] = useState(getCurrentSeason())
+export function SeasonalIntro({ theme }: { theme?: string }) {
+  const season = getSeasonByTheme(theme)
   const [showIntro, setShowIntro] = useState(false)
 
   useEffect(() => {
-    const currentSeason = getCurrentSeason()
-    setSeason(currentSeason)
-
     // Show seasonal intro for special occasions
-    if (currentSeason.theme !== "default") {
-      const hasSeenIntro = localStorage.getItem(`seasonal-intro-${currentSeason.theme}`)
+    if (season.theme !== "default") {
+      const hasSeenIntro = localStorage.getItem(`seasonal-intro-${season.theme}`)
       if (!hasSeenIntro) {
         setShowIntro(true)
         setTimeout(() => {
           setShowIntro(false)
-          localStorage.setItem(`seasonal-intro-${currentSeason.theme}`, "true")
+          localStorage.setItem(`seasonal-intro-${season.theme}`, "true")
         }, 3000)
       }
     }
-  }, [])
+  }, [season.theme])
 
   if (!showIntro || season.theme === "default") {
     return null
@@ -59,7 +56,6 @@ export function SeasonalIntro() {
           </motion.div>
 
           <h2 className="text-2xl font-bold mb-2">{season.greeting}</h2>
-          <p className="text-blue-200">{season.message}</p>
 
           <motion.div
             initial={{ width: 0 }}

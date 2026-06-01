@@ -7,6 +7,7 @@ export interface SchoolBranding {
   schoolName: string
   motto: string
   logoUrl: string
+  seasonalTheme: string
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -16,6 +17,7 @@ export const DEFAULT_BRANDING = {
   schoolName: "St. Theresa S.S. Buloba-Kasero",
   motto: "Mercy Upon Us",
   logoUrl: "/logo.png",
+  seasonalTheme: "auto",
 }
 
 const BrandingContext = createContext<SchoolBranding>({
@@ -30,19 +32,21 @@ export function SchoolBrandingProvider({ children }: { children: React.ReactNode
   const [schoolName, setSchoolName] = useState(DEFAULT_BRANDING.schoolName)
   const [motto, setMotto] = useState(DEFAULT_BRANDING.motto)
   const [logoUrl, setLogoUrl] = useState(DEFAULT_BRANDING.logoUrl)
+  const [seasonalTheme, setSeasonalTheme] = useState(DEFAULT_BRANDING.seasonalTheme)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
       const { data } = await supabase
         .from("election_settings")
-        .select("school_name, school_motto, logo_url")
+        .select("school_name, school_motto, logo_url, seasonal_theme")
         .limit(1)
         .single()
       if (data) {
         setSchoolName(data.school_name?.trim() || DEFAULT_BRANDING.schoolName)
         setMotto(data.school_motto?.trim() || DEFAULT_BRANDING.motto)
         setLogoUrl(data.logo_url?.trim() || DEFAULT_BRANDING.logoUrl)
+        setSeasonalTheme(data.seasonal_theme?.trim() || DEFAULT_BRANDING.seasonalTheme)
       }
     } catch {
       // keep defaults
@@ -60,7 +64,7 @@ export function SchoolBrandingProvider({ children }: { children: React.ReactNode
   }, [refresh])
 
   return (
-    <BrandingContext.Provider value={{ schoolName, motto, logoUrl, loading, refresh }}>
+    <BrandingContext.Provider value={{ schoolName, motto, logoUrl, seasonalTheme, loading, refresh }}>
       {children}
     </BrandingContext.Provider>
   )

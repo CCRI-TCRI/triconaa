@@ -14,37 +14,36 @@ import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { userDb } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
-import { getCurrentSeason, getSeasonalContainerClass } from "@/lib/seasons"
+import { getSeasonByTheme, getSeasonalContainerClass } from "@/lib/seasons"
 
 type AppState = "auth" | "tutorial" | "voting" | "complete"
 
 export default function VotingApp() {
-  const { schoolName, logoUrl } = useSchoolBranding()
+  const { schoolName, logoUrl, seasonalTheme } = useSchoolBranding()
   const [appState, setAppState] = useState<AppState>("auth")
   const [studentId, setStudentId] = useState("")
   const [studentName, setStudentName] = useState("")
   const [showTutorial, setShowTutorial] = useState(false)
   const [showHolidayGreeting, setShowHolidayGreeting] = useState(false)
-  const [season, setSeason] = useState(getCurrentSeason())
+
+  // Season is driven by the admin Settings (falls back to date-based when "auto")
+  const season = getSeasonByTheme(seasonalTheme)
 
   useEffect(() => {
-    const currentSeason = getCurrentSeason()
-    setSeason(currentSeason)
-
     const hasSeenTutorial = localStorage.getItem("voting-tutorial-seen")
     if (!hasSeenTutorial) setShowTutorial(true)
 
-    const hasSeenHolidayGreeting = localStorage.getItem(`holiday-greeting-${currentSeason.theme}`)
-    if (!hasSeenHolidayGreeting && currentSeason.theme !== "default") {
+    const hasSeenHolidayGreeting = localStorage.getItem(`holiday-greeting-${season.theme}`)
+    if (!hasSeenHolidayGreeting && season.theme !== "default") {
       setTimeout(() => setShowHolidayGreeting(true), 1000)
     }
 
-    if (currentSeason.theme === "halloween") {
+    if (season.theme === "halloween") {
       document.documentElement.classList.add("dark")
     } else {
       document.documentElement.classList.remove("dark")
     }
-  }, [])
+  }, [season.theme])
 
   const handleAuthSuccess = async (id: string) => {
     setStudentId(id)
@@ -86,8 +85,8 @@ export default function VotingApp() {
   if (appState === "auth") {
     return (
       <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
-        <SeasonalIntro />
-        <SeasonalBackground />
+        <SeasonalIntro theme={season.theme} />
+        <SeasonalBackground theme={season.theme} />
         <BiometricAuth onAuthSuccess={handleAuthSuccess} />
         <AdminAccessButton />
         {showTutorial && <TutorialPopup onClose={handleTutorialClose} onComplete={handleTutorialPopupComplete} />}
@@ -99,8 +98,8 @@ export default function VotingApp() {
   if (appState === "tutorial") {
     return (
       <div className="relative">
-        <SeasonalIntro />
-        <SeasonalBackground />
+        <SeasonalIntro theme={season.theme} />
+        <SeasonalBackground theme={season.theme} />
         <WelcomeTutorial onComplete={handleTutorialComplete} studentName={studentName || studentId} />
         <AdminAccessButton />
       </div>
@@ -110,8 +109,8 @@ export default function VotingApp() {
   if (appState === "voting") {
     return (
       <div className="relative">
-        <SeasonalIntro />
-        <SeasonalBackground />
+        <SeasonalIntro theme={season.theme} />
+        <SeasonalBackground theme={season.theme} />
         <VotingBallot studentId={studentId} onVoteComplete={handleVoteComplete} />
         <AdminAccessButton />
       </div>
@@ -121,8 +120,8 @@ export default function VotingApp() {
   if (appState === "complete") {
     return (
       <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
-        <SeasonalIntro />
-        <SeasonalBackground />
+        <SeasonalIntro theme={season.theme} />
+        <SeasonalBackground theme={season.theme} />
         <AdminAccessButton />
         <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
           <motion.div
