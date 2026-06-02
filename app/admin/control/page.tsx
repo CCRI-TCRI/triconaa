@@ -5,438 +5,238 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { motion } from "framer-motion"
 import {
-  Power,
-  PowerOff,
-  RefreshCw,
-  Settings,
-  Database,
-  Vote,
-  Shield,
-  AlertTriangle,
-  CheckCircle,
-  Activity,
-  Server,
-  Zap,
-} from "lucide-react"
-import { userDb, voteDb } from "@/lib/db"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { motion } from "framer-motion"
+import Link from "next/link"
+import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles } from "lucide-react"
+import { userDb, voteDb, electionControl, type ElectionStatus } from "@/lib/db"
+import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
 
-interface SystemStatus {
-  database: "online" | "offline" | "warning"
-  voting: "active" | "inactive" | "paused"
-  authentication: "online" | "offline"
-  realtime: "connected" | "disconnected"
+const STATUS_META: Record<ElectionStatus, { label: string; color: string; desc: string }> = {
+  active: { label: "Active", color: "bg-green-100 text-green-700", desc: "Voting is open. Students can log in and cast their ballots." },
+  paused: { label: "Paused", color: "bg-amber-100 text-amber-700", desc: "Voting is temporarily paused. The login screen is hidden." },
+  stopped: { label: "Stopped", color: "bg-red-100 text-red-700", desc: "Voting is closed. The login screen shows the upcoming-election notice." },
+  completed: { label: "Completed", color: "bg-blue-100 text-blue-700", desc: "Results are final. Live Results now jumps to the Reveal Show." },
 }
 
 export default function ControlSystemPage() {
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    database: "online",
-    voting: "active",
-    authentication: "online",
-    realtime: "connected",
-  })
+  const [status, setStatus] = useState<ElectionStatus>("active")
+  const [term, setTerm] = useState("2027 democratic term")
+  const [stats, setStats] = useState({ totalVoters: 0, votedCount: 0, totalVotes: 0 })
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(new Date())
-  const [stats, setStats] = useState({
-    totalVoters: 0,
-    activeVotes: 0,
-    systemUptime: "99.9%",
-    responseTime: "45ms",
-  })
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    checkSystemStatus()
-    const interval = setInterval(checkSystemStatus, 10000) // Check every 10 seconds
+    refresh()
+    const interval = setInterval(loadStats, 10000)
     return () => clearInterval(interval)
   }, [])
 
-  const checkSystemStatus = async () => {
+  const refresh = async () => {
+    const { status, term } = await electionControl.get()
+    setStatus(status)
+    setTerm(term)
+    loadStats()
+  }
+
+  const loadStats = async () => {
     try {
-      // Query Supabase for live system stats
-      try {
-        const [users, votes] = await Promise.all([userDb.getAll(), voteDb.getAll()])
-
-        setSystemStatus((prev) => ({ ...prev, database: "online", authentication: "online" }))
-        setStats((prev) => ({
-          ...prev,
-          totalVoters: users.length,
-          activeVotes: votes.length,
-        }))
-      } catch (error) {
-        setSystemStatus((prev) => ({ ...prev, database: "offline" }))
-      }
-
-      setSystemStatus((prev) => ({ ...prev, realtime: "connected" }))
+      const [users, votes] = await Promise.all([userDb.getAll(), voteDb.getAll()])
+      setStats({ totalVoters: users.length, votedCount: users.filter((u) => u.has_voted).length, totalVotes: votes.length })
       setLastUpdate(new Date())
     } catch (error) {
-      console.error("System check failed:", error)
-      setSystemStatus((prev) => ({ ...prev, database: "offline", authentication: "offline" }))
+      console.error("Stats load failed:", error)
     }
   }
 
-  const handleStartElection = async () => {
+  const changeStatus = async (next: ElectionStatus) => {
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setSystemStatus((prev) => ({ ...prev, voting: "active" }))
+      await electionControl.setStatus(next)
+      setStatus(next)
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
     } catch (error) {
-      console.error("Failed to start election:", error)
+      console.error("Failed to change status:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStopElection = async () => {
+  const handleReset = async () => {
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setSystemStatus((prev) => ({ ...prev, voting: "inactive" }))
-    } catch (error) {
-      console.error("Failed to stop election:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handlePauseElection = async () => {
-    setLoading(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      setSystemStatus((prev) => ({ ...prev, voting: "paused" }))
-    } catch (error) {
-      console.error("Failed to pause election:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleResetSystem = async () => {
-    if (!confirm("Are you sure you want to reset the entire system? This action cannot be undone.")) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      // Clear all cast votes and reset voter status in Supabase
       await voteDb.deleteAll()
       await userDb.resetAllVotes()
-
-      setSystemStatus({
-        database: "online",
-        voting: "inactive",
-        authentication: "online",
-        realtime: "connected",
-      })
-      setStats({
-        totalVoters: 0,
-        activeVotes: 0,
-        systemUptime: "99.9%",
-        responseTime: "45ms",
-      })
-      
-      // Reload page to reinitialize
+      await electionControl.setStatus("active")
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
       window.location.reload()
     } catch (error) {
-      console.error("Failed to reset system:", error)
+      console.error("Failed to reset:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-      case "active":
-      case "connected":
-        return "text-green-600 bg-green-100"
-      case "offline":
-      case "inactive":
-      case "disconnected":
-        return "text-red-600 bg-red-100"
-      case "paused":
-      case "warning":
-        return "text-yellow-600 bg-yellow-100"
-      default:
-        return "text-gray-600 bg-gray-100"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "online":
-      case "active":
-      case "connected":
-        return <CheckCircle className="w-4 h-4" />
-      case "offline":
-      case "inactive":
-      case "disconnected":
-        return <AlertTriangle className="w-4 h-4" />
-      case "paused":
-      case "warning":
-        return <AlertTriangle className="w-4 h-4" />
-      default:
-        return <Activity className="w-4 h-4" />
-    }
-  }
+  const turnout = stats.totalVoters > 0 ? Math.round((stats.votedCount / stats.totalVoters) * 100) : 0
+  const meta = STATUS_META[status]
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Election Control System</h1>
-        <p className="text-muted-foreground">Monitor and control all election system components</p>
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#5c0f1f] via-[#7a1f2b] to-[#3b0a14] p-6 text-white shadow-2xl">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Election Control</h1>
+            <p className="text-sm text-rose-100/80">Start, pause, stop or complete the {term}</p>
+          </div>
+          <Badge className={`${meta.color} px-4 py-2 text-sm font-bold`}>
+            <span className="capitalize">Status: {meta.label}</span>
+          </Badge>
+        </div>
       </div>
 
-      {/* System Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Database</CardTitle>
-              <Database className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Badge className={getStatusColor(systemStatus.database)}>
-                  {getStatusIcon(systemStatus.database)}
-                  <span className="ml-1 capitalize">{systemStatus.database}</span>
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      <Alert>
+        <Flag className="h-4 w-4" />
+        <AlertDescription>{meta.desc}</AlertDescription>
+      </Alert>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Voting System</CardTitle>
-              <Vote className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Badge className={getStatusColor(systemStatus.voting)}>
-                  {getStatusIcon(systemStatus.voting)}
-                  <span className="ml-1 capitalize">{systemStatus.voting}</span>
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Authentication</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Badge className={getStatusColor(systemStatus.authentication)}>
-                  {getStatusIcon(systemStatus.authentication)}
-                  <span className="ml-1 capitalize">{systemStatus.authentication}</span>
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Real-time Updates</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <Badge className={getStatusColor(systemStatus.realtime)}>
-                  {getStatusIcon(systemStatus.realtime)}
-                  <span className="ml-1 capitalize">{systemStatus.realtime}</span>
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* System Metrics */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+      {/* Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="w-5 h-5" />
-              System Metrics
-            </CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Registered Voters</CardTitle>
+            <Users className="h-4 w-4 text-rose-600" />
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{stats.totalVoters}</div>
-                <div className="text-sm text-muted-foreground">Total Voters</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{stats.activeVotes}</div>
-                <div className="text-sm text-muted-foreground">Active Votes</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{stats.systemUptime}</div>
-                <div className="text-sm text-muted-foreground">System Uptime</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{stats.responseTime}</div>
-                <div className="text-sm text-muted-foreground">Response Time</div>
-              </div>
-            </div>
-          </CardContent>
+          <CardContent><div className="text-2xl font-bold">{stats.totalVoters}</div></CardContent>
         </Card>
-      </motion.div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Votes Cast</CardTitle>
+            <Vote className="h-4 w-4 text-rose-600" />
+          </CardHeader>
+          <CardContent><div className="text-2xl font-bold">{stats.totalVotes}</div></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Turnout</CardTitle>
+            <Trophy className="h-4 w-4 text-rose-600" />
+          </CardHeader>
+          <CardContent><div className="text-2xl font-bold">{turnout}%</div></CardContent>
+        </Card>
+      </div>
 
-      {/* Control Actions */}
+      {/* Controls */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Election Controls */}
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Power className="w-5 h-5" />
-                Election Controls
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Power className="h-5 w-5" />Voting Controls</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Button
-                  onClick={handleStartElection}
-                  disabled={loading || systemStatus.voting === "active"}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Power className="w-4 h-4 mr-2" />
-                  Start Election
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Button onClick={() => changeStatus("active")} disabled={loading || status === "active" || status === "completed"} className="bg-green-600 hover:bg-green-700">
+                  <Power className="mr-2 h-4 w-4" />Start
                 </Button>
-                <Button
-                  onClick={handlePauseElection}
-                  disabled={loading || systemStatus.voting !== "active"}
-                  variant="outline"
-                  className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 bg-transparent"
-                >
-                  <PowerOff className="w-4 h-4 mr-2" />
-                  Pause Election
+                <Button onClick={() => changeStatus("paused")} disabled={loading || status !== "active"} variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-50">
+                  <PauseCircle className="mr-2 h-4 w-4" />Pause
                 </Button>
-                <Button
-                  onClick={handleStopElection}
-                  disabled={loading || systemStatus.voting === "inactive"}
-                  variant="destructive"
-                >
-                  <PowerOff className="w-4 h-4 mr-2" />
-                  Stop Election
+                <Button onClick={() => changeStatus("stopped")} disabled={loading || status === "stopped" || status === "completed"} variant="destructive">
+                  <StopCircle className="mr-2 h-4 w-4" />Stop
                 </Button>
               </div>
-
-              {systemStatus.voting === "active" && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Election is currently active. Students can vote and results are being updated in real-time.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {systemStatus.voting === "paused" && (
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Election is paused. No new votes can be cast until the election is resumed.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {systemStatus.voting === "inactive" && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>Election is not active. Students cannot vote at this time.</AlertDescription>
-                </Alert>
-              )}
+              <p className="text-xs text-muted-foreground">
+                While paused or stopped, voters see a branded “elections coming” screen instead of the login page.
+              </p>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* System Actions */}
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
-          <Card>
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+          <Card className="border-blue-200">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                System Actions
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2 text-blue-900"><Flag className="h-5 w-5" />Finish the Election</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <Button
-                  onClick={checkSystemStatus}
-                  disabled={loading}
-                  variant="outline"
-                  className="w-full bg-transparent"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh System Status
-                </Button>
-
-                <Button onClick={handleResetSystem} disabled={loading} variant="destructive" className="w-full">
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Reset Entire System
-                </Button>
-              </div>
-
-              <div className="text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg">
-                <p className="font-semibold mb-2">Last System Check:</p>
-                <p>{lastUpdate.toLocaleString()}</p>
-              </div>
-
-              <Alert>
-                <Shield className="h-4 w-4" />
-                <AlertDescription>
-                  System actions require administrator privileges and may affect ongoing elections.
-                </AlertDescription>
-              </Alert>
+              {status === "completed" ? (
+                <>
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Sparkles className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      Election complete. The Live Results screen now redirects to the Reveal Show automatically.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="flex gap-2">
+                    <Link href="/admin/reveal" className="flex-1">
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700"><Sparkles className="mr-2 h-4 w-4" />Open Reveal Show</Button>
+                    </Link>
+                    <Button onClick={() => changeStatus("active")} variant="outline" disabled={loading}>Reopen Voting</Button>
+                  </div>
+                </>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700">
+                      <Flag className="mr-2 h-4 w-4" />Complete Election
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Complete the election?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This locks the results. The voter screen will show the winners, and the Live Results screen will
+                        automatically switch to the Reveal Show. You can reopen voting afterwards if needed.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => changeStatus("completed")} className="bg-blue-600 hover:bg-blue-700">
+                        Complete &amp; Reveal
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <p className="text-xs text-muted-foreground">Last updated {lastUpdate.toLocaleTimeString()}</p>
             </CardContent>
           </Card>
         </motion.div>
       </div>
 
-      {/* System Logs */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              System Activity Log
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg text-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="text-green-700 font-medium">System Status Check</span>
-                <span className="text-gray-500 ml-auto">{lastUpdate.toLocaleTimeString()}</span>
-              </div>
-              <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg text-sm">
-                <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="text-blue-700 font-medium">Supabase Database Verified</span>
-                <span className="text-gray-500 ml-auto">{new Date(Date.now() - 60000).toLocaleTimeString()}</span>
-              </div>
-              <div className="flex items-center gap-3 p-2 bg-purple-50 rounded-lg text-sm">
-                <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                <span className="text-purple-700 font-medium">Real-time Updates Active</span>
-                <span className="text-gray-500 ml-auto">{new Date(Date.now() - 120000).toLocaleTimeString()}</span>
-              </div>
-              <div className="flex items-center gap-3 p-2 bg-orange-50 rounded-lg text-sm">
-                <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                <span className="text-orange-700 font-medium">Authentication System Online</span>
-                <span className="text-gray-500 ml-auto">{new Date(Date.now() - 180000).toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      {/* Danger zone */}
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700"><AlertTriangle className="h-5 w-5" />Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">Reset clears all cast votes, reopens voting, and marks every voter as not-voted.</p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={loading}><RefreshCw className="mr-2 h-4 w-4" />Reset Election</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reset the entire election?</AlertDialogTitle>
+                <AlertDialogDescription>This deletes all votes and cannot be undone. Voters and candidates are kept.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReset} className="bg-red-600 hover:bg-red-700">Reset Everything</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
     </div>
   )
 }

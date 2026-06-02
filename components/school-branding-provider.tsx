@@ -8,6 +8,8 @@ export interface SchoolBranding {
   motto: string
   logoUrl: string
   seasonalTheme: string
+  electionStatus: "active" | "paused" | "stopped" | "completed"
+  electionTerm: string
   loading: boolean
   refresh: () => Promise<void>
 }
@@ -18,6 +20,8 @@ export const DEFAULT_BRANDING = {
   motto: "Mercy Upon Us",
   logoUrl: "/logo.png",
   seasonalTheme: "auto",
+  electionStatus: "active" as const,
+  electionTerm: "2027 democratic term",
 }
 
 const BrandingContext = createContext<SchoolBranding>({
@@ -33,13 +37,15 @@ export function SchoolBrandingProvider({ children }: { children: React.ReactNode
   const [motto, setMotto] = useState(DEFAULT_BRANDING.motto)
   const [logoUrl, setLogoUrl] = useState(DEFAULT_BRANDING.logoUrl)
   const [seasonalTheme, setSeasonalTheme] = useState(DEFAULT_BRANDING.seasonalTheme)
+  const [electionStatus, setElectionStatus] = useState<SchoolBranding["electionStatus"]>(DEFAULT_BRANDING.electionStatus)
+  const [electionTerm, setElectionTerm] = useState(DEFAULT_BRANDING.electionTerm)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
       const { data } = await supabase
         .from("election_settings")
-        .select("school_name, school_motto, logo_url, seasonal_theme")
+        .select("school_name, school_motto, logo_url, seasonal_theme, election_status, election_term")
         .limit(1)
         .single()
       if (data) {
@@ -47,6 +53,8 @@ export function SchoolBrandingProvider({ children }: { children: React.ReactNode
         setMotto(data.school_motto?.trim() || DEFAULT_BRANDING.motto)
         setLogoUrl(data.logo_url?.trim() || DEFAULT_BRANDING.logoUrl)
         setSeasonalTheme(data.seasonal_theme?.trim() || DEFAULT_BRANDING.seasonalTheme)
+        setElectionStatus((data.election_status as SchoolBranding["electionStatus"]) || DEFAULT_BRANDING.electionStatus)
+        setElectionTerm(data.election_term?.trim() || DEFAULT_BRANDING.electionTerm)
       }
     } catch {
       // keep defaults
@@ -64,7 +72,7 @@ export function SchoolBrandingProvider({ children }: { children: React.ReactNode
   }, [refresh])
 
   return (
-    <BrandingContext.Provider value={{ schoolName, motto, logoUrl, seasonalTheme, loading, refresh }}>
+    <BrandingContext.Provider value={{ schoolName, motto, logoUrl, seasonalTheme, electionStatus, electionTerm, loading, refresh }}>
       {children}
     </BrandingContext.Provider>
   )

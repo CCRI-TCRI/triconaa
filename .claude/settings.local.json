@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(npm install -g vercel)",
-      "Bash(gh auth *)"
+      "Bash(gh auth *)",
+      "mcp__7c4ae74d-c860-43ec-b3b7-f1ce209fc0f5__apply_migration"
     ]
   }
 }

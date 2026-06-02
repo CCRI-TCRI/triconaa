@@ -9,6 +9,8 @@ import { HolidayPopup } from "@/components/holiday-popup"
 import { SeasonalBackground } from "@/components/seasonal-background"
 import { AdminAccessButton } from "@/components/admin-access-button"
 import { SeasonalIntro } from "@/components/seasonal-intro"
+import { ElectionClosedScreen } from "@/components/election-closed-screen"
+import { WinnersScreen } from "@/components/winners-screen"
 import { motion } from "framer-motion"
 import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,7 +21,7 @@ import { getSeasonByTheme, getSeasonalContainerClass } from "@/lib/seasons"
 type AppState = "auth" | "tutorial" | "voting" | "complete"
 
 export default function VotingApp() {
-  const { schoolName, logoUrl, seasonalTheme } = useSchoolBranding()
+  const { schoolName, logoUrl, seasonalTheme, electionStatus } = useSchoolBranding()
   const [appState, setAppState] = useState<AppState>("auth")
   const [studentId, setStudentId] = useState("")
   const [studentName, setStudentName] = useState("")
@@ -83,6 +85,23 @@ export default function VotingApp() {
   }
 
   if (appState === "auth") {
+    // Election lifecycle gates the public landing page
+    if (electionStatus === "completed") {
+      return (
+        <div className="relative">
+          <WinnersScreen />
+          <AdminAccessButton />
+        </div>
+      )
+    }
+    if (electionStatus === "paused" || electionStatus === "stopped") {
+      return (
+        <div className="relative">
+          <ElectionClosedScreen />
+          <AdminAccessButton />
+        </div>
+      )
+    }
     return (
       <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
         <SeasonalIntro theme={season.theme} />

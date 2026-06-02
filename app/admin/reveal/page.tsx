@@ -79,7 +79,7 @@ function TurnoutRing({ pct }: { pct: number }) {
 type Phase = "lobby" | "countdown" | "racing" | "drumroll" | "revealed" | "finale"
 
 export default function RevealShowPage() {
-  const { schoolName, motto, logoUrl } = useSchoolBranding()
+  const { schoolName, motto, logoUrl, electionStatus } = useSchoolBranding()
   const [races, setRaces] = useState<Race[]>([])
   const [classTurnout, setClassTurnout] = useState<{ cls: string; pct: number; voted: number; total: number }[]>([])
   const [turnout, setTurnout] = useState(0)
@@ -155,11 +155,30 @@ export default function RevealShowPage() {
       const t = setTimeout(() => setPhase("revealed"), 3000)
       return () => clearTimeout(t)
     }
-  }, [phase, index, race?.photoFinish])
+    if (phase === "revealed") {
+      // Hold the poster for 5 seconds, then move on automatically
+      const t = setTimeout(() => {
+        if (index < races.length - 1) {
+          setIndex(index + 1)
+          setPhase("racing")
+        } else {
+          setPhase("finale")
+        }
+      }, 5000)
+      return () => clearTimeout(t)
+    }
+  }, [phase, index, race?.photoFinish, races.length])
 
   useEffect(() => {
     if (phase === "revealed" || phase === "finale") fireConfetti()
   }, [phase, index])
+
+  // When the election has been completed, start the show automatically
+  useEffect(() => {
+    if (!loading && races.length > 0 && electionStatus === "completed" && phase === "lobby") {
+      setPhase("countdown")
+    }
+  }, [loading, races.length, electionStatus, phase])
 
   const goNext = useCallback(() => {
     if (index < races.length - 1) {
@@ -501,17 +520,73 @@ export default function RevealShowPage() {
               )}
             </AnimatePresence>
 
-            {/* winner banner + controls */}
-            {revealed && winner && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 mt-4 flex items-center justify-center gap-3">
-                <button onClick={(e) => { e.stopPropagation(); downloadPoster(race, winner) }} disabled={posterBusy} className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold hover:bg-white/20">
-                  {posterBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Winner Poster
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); goNext() }} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-7 py-2.5 text-sm font-black uppercase tracking-wider text-[#3b0a14] shadow-lg transition hover:scale-105">
-                  {index < races.length - 1 ? <>Next Position <ChevronRight className="h-4 w-4" /></> : <>Grand Finale <Sparkles className="h-4 w-4" /></>}
-                </button>
-              </motion.div>
-            )}
+            {/* On-screen winner poster (auto-advances after 5s) */}
+            <AnimatePresence>
+              {revealed && winner && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+                >
+                  <motion.div
+                    initial={{ scale: 0.82, y: 30 }}
+                    animate={{ scale: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 150, damping: 16 }}
+                    className="relative w-full max-w-md overflow-hidden rounded-3xl border-4 border-amber-400 bg-gradient-to-br from-[#5c0f1f] via-[#7a1f2b] to-[#3b0a14] px-8 pb-7 pt-8 text-center shadow-2xl"
+                  >
+                    {/* crest */}
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-amber-300/50">
+                      <img src={logoUrl} alt={schoolName} className="h-12 w-12 object-contain" />
+                    </div>
+                    <p className="text-xs font-bold uppercase tracking-[0.4em] text-amber-300">Winner</p>
+                    <p className="mt-1 text-sm font-semibold uppercase tracking-widest text-white/80">{race.name}</p>
+
+                    {/* photo + crown */}
+                    <div className="relative mx-auto my-5 h-40 w-40">
+                      <div className="h-40 w-40 overflow-hidden rounded-full ring-4 ring-amber-400">
+                        {winner.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={winner.photo_url} alt={winner.full_name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-white/10 text-5xl font-black text-amber-300">
+                            {initials(winner.full_name)}
+                          </div>
+                        )}
+                      </div>
+                      <motion.div initial={{ scale: 0, rotate: -40 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.2, type: "spring", stiffness: 200 }} className="absolute -right-1 -top-1 flex h-12 w-12 items-center justify-center rounded-full bg-amber-400 shadow-lg">
+                        <Crown className="h-7 w-7 text-[#3b0a14]" />
+                      </motion.div>
+                    </div>
+
+                    <h3 className="text-3xl font-black leading-tight text-white">{winner.full_name}</h3>
+                    {winner.class && <p className="mt-1 text-sm text-amber-100/80">{winner.class}</p>}
+                    <p className="mt-3 inline-block rounded-full bg-white/10 px-4 py-1 text-sm font-bold text-amber-200">
+                      <Odometer value={winner.votes} className="text-amber-300" /> votes · {new Date().getFullYear()}
+                    </p>
+
+                    {/* actions */}
+                    <div className="mt-6 flex items-center justify-center gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); downloadPoster(race, winner) }} disabled={posterBusy} className="flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20">
+                        {posterBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Save Poster
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); goNext() }} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-5 py-2 text-xs font-black uppercase tracking-wider text-[#3b0a14] hover:scale-105">
+                        {index < races.length - 1 ? <>Next <ChevronRight className="h-4 w-4" /></> : <>Finale <Sparkles className="h-4 w-4" /></>}
+                      </button>
+                    </div>
+
+                    {/* 5s auto-advance bar */}
+                    <motion.div
+                      key={`bar-${index}`}
+                      initial={{ width: "100%" }}
+                      animate={{ width: "0%" }}
+                      transition={{ duration: 5, ease: "linear" }}
+                      className="absolute bottom-0 left-0 h-1 bg-amber-400"
+                    />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 

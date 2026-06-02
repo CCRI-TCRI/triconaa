@@ -196,3 +196,29 @@ export async function getPositionsWithCandidates(): Promise<Array<Position & { c
     candidates: (candidates ?? []).filter((c) => c.position_id === position.id),
   }))
 }
+
+// ── Election control (status + term) ──────────────────────────
+
+export type ElectionStatus = "active" | "paused" | "stopped" | "completed"
+
+export const electionControl = {
+  get: async (): Promise<{ status: ElectionStatus; term: string }> => {
+    const { data } = await supabase
+      .from("election_settings")
+      .select("election_status, election_term")
+      .limit(1)
+      .single()
+    return {
+      status: (data?.election_status as ElectionStatus) || "active",
+      term: data?.election_term || "2027 democratic term",
+    }
+  },
+
+  setStatus: async (status: ElectionStatus): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ election_status: status }).eq("id", row.id)
+    if (error) { console.error("electionControl.setStatus:", error.message); return false }
+    return true
+  },
+}

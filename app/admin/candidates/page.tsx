@@ -35,6 +35,44 @@ export default function CandidatesPage() {
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
+  // Resize an uploaded photo to a compact square-ish PNG data URL stored in photo_url
+  const resizeImage = (file: File, max = 400): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = new window.Image()
+        img.onload = () => {
+          let { width, height } = img
+          if (width > height && width > max) { height = Math.round((height * max) / width); width = max }
+          else if (height > max) { width = Math.round((width * max) / height); height = max }
+          const canvas = document.createElement("canvas")
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext("2d")
+          if (!ctx) return reject(new Error("no ctx"))
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL("image/jpeg", 0.85))
+        }
+        img.onerror = reject
+        img.src = reader.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const handlePhoto = async (file: File | undefined, apply: (url: string) => void) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image.", variant: "destructive" })
+      return
+    }
+    try {
+      apply(await resizeImage(file))
+    } catch {
+      toast({ title: "Error", description: "Could not process that image.", variant: "destructive" })
+    }
+  }
+
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
@@ -147,7 +185,26 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div><Label>Manifesto</Label><Textarea value={newCandidate.manifesto} onChange={(e) => setNewCandidate((p) => ({ ...p, manifesto: e.target.value }))} rows={3} /></div>
-                <div><Label>Photo URL (optional)</Label><Input value={newCandidate.photo_url} onChange={(e) => setNewCandidate((p) => ({ ...p, photo_url: e.target.value }))} /></div>
+                <div>
+                  <Label>Candidate Photo</Label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                      {newCandidate.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={newCandidate.photo_url} alt="preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <UserPlus className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <label className="cursor-pointer">
+                      <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setNewCandidate((p) => ({ ...p, photo_url: url })))} />
+                    </label>
+                    {newCandidate.photo_url && (
+                      <Button variant="ghost" size="sm" onClick={() => setNewCandidate((p) => ({ ...p, photo_url: "" }))}>Remove</Button>
+                    )}
+                  </div>
+                </div>
                 <Button onClick={addCandidate} className="w-full" disabled={saving}>{saving ? "Adding..." : "Add Candidate"}</Button>
               </div>
             </DialogContent>
@@ -209,7 +266,19 @@ export default function CandidatesPage() {
               {filtered.map((candidate) => (
                 <TableRow key={candidate.id}>
                   <TableCell className="font-medium">{candidate.student_id}</TableCell>
-                  <TableCell>{candidate.full_name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-1 ring-border">
+                        {candidate.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={candidate.photo_url} alt={candidate.full_name} className="h-full w-full object-cover" />
+                        ) : (
+                          candidate.full_name.split(" ").map((n) => n[0]).slice(0, 2).join("")
+                        )}
+                      </div>
+                      {candidate.full_name}
+                    </div>
+                  </TableCell>
                   <TableCell>{candidate.class}</TableCell>
                   <TableCell><Badge variant="outline">{getPositionName(candidate.position_id)}</Badge></TableCell>
                   <TableCell><Badge>{candidate.vote_count}</Badge></TableCell>
@@ -262,6 +331,26 @@ export default function CandidatesPage() {
                 </Select>
               </div>
               <div><Label>Manifesto</Label><Textarea value={editingCandidate.manifesto} onChange={(e) => setEditingCandidate({ ...editingCandidate, manifesto: e.target.value })} rows={3} /></div>
+              <div>
+                <Label>Candidate Photo</Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                    {editingCandidate.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={editingCandidate.photo_url} alt="preview" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserPlus className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <label className="cursor-pointer">
+                    <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setEditingCandidate({ ...editingCandidate, photo_url: url }))} />
+                  </label>
+                  {editingCandidate.photo_url && (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCandidate({ ...editingCandidate, photo_url: "" })}>Remove</Button>
+                  )}
+                </div>
+              </div>
               <Button onClick={updateCandidate} className="w-full" disabled={saving}>{saving ? "Updating..." : "Update Candidate"}</Button>
             </div>
           )}
