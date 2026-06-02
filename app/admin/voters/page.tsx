@@ -25,6 +25,8 @@ import {
 import { toast } from "@/hooks/use-toast"
 import { supabase, getErrorMessage, isSupabaseConfigured } from "@/lib/supabase"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { FaceCamera } from "@/components/face-camera"
+import { encodeDescriptor } from "@/lib/face-recognition"
 import * as XLSX from "xlsx"
 import {
     Users,
@@ -46,6 +48,7 @@ import {
     FileText,
     FileDown,
     X,
+    ScanFace,
   } from "lucide-react"
 
 interface Voter {
@@ -57,6 +60,7 @@ interface Voter {
   has_voted: boolean
   created_at: string
   voted_at?: string
+  face_encoding?: string | null
 }
 
 interface ParsedRow {
@@ -100,6 +104,8 @@ export default function VotersPage() {
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
   const [importProgress, setImportProgress] = useState(0)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [enrollVoter, setEnrollVoter] = useState<Voter | null>(null)
+  const [enrollBusy, setEnrollBusy] = useState(false)
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -514,6 +520,40 @@ export default function VotersPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleEnrollFace = async (descriptor: Float32Array) => {
+    if (!enrollVoter) return
+    setEnrollBusy(true)
+    try {
+      const encoding = encodeDescriptor(descriptor)
+      const { error } = await supabase.from("users").update({ face_encoding: encoding }).eq("id", enrollVoter.id)
+      if (error) throw error
+      setVoters((prev) => prev.map((v) => (v.id === enrollVoter.id ? { ...v, face_encoding: encoding } : v)))
+      toast({ title: "Face enrolled", description: `${enrollVoter.full_name} can now log in with their face.` })
+      setEnrollVoter(null)
+    } catch (error) {
+      console.error("Error enrolling face:", error)
+      toast({ title: "Error", description: "Failed to save face.", variant: "destructive" })
+    } finally {
+      setEnrollBusy(false)
+    }
+  }
+
+  const removeFace = async (voter: Voter) => {
+    setEnrollBusy(true)
+    try {
+      const { error } = await supabase.from("users").update({ face_encoding: null }).eq("id", voter.id)
+      if (error) throw error
+      setVoters((prev) => prev.map((v) => (v.id === voter.id ? { ...v, face_encoding: null } : v)))
+      toast({ title: "Face removed", description: `Face login disabled for ${voter.full_name}.` })
+      setEnrollVoter(null)
+    } catch (error) {
+      console.error("Error removing face:", error)
+      toast({ title: "Error", description: "Failed to remove face.", variant: "destructive" })
+    } finally {
+      setEnrollBusy(false)
     }
   }
 
@@ -1131,6 +1171,16 @@ export default function VotersPage() {
                       >
                         <Key className="w-3 h-3" />
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEnrollVoter(voter)}
+                        disabled={saving}
+                        title={voter.face_encoding ? "Face enrolled — manage" : "Enroll face"}
+                        className={voter.face_encoding ? "border-green-300 text-green-700" : ""}
+                      >
+                        <ScanFace className="w-3 h-3" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="sm" disabled={saving}>
@@ -1201,6 +1251,47 @@ export default function VotersPage() {
               <Button onClick={editVoter} className="w-full" disabled={saving}>
                 {saving ? "Updating..." : "Update Voter"}
               </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Face enrollment dialog */}
+      <Dialog open={!!enrollVoter} onOpenChange={(o) => !o && !enrollBusy && setEnrollVoter(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanFace className="h-5 w-5 text-rose-700" />
+              Face Enrollment
+            </DialogTitle>
+          </DialogHeader>
+          {enrollVoter && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-muted/40 p-3 text-sm">
+                <p className="font-semibold">{enrollVoter.full_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {enrollVoter.student_id} · {enrollVoter.class} · Code {enrollVoter.voting_code}
+                </p>
+                {enrollVoter.face_encoding && (
+                  <p className="mt-1 text-xs font-medium text-green-700">A face is already enrolled. Re-scan to replace it.</p>
+                )}
+              </div>
+
+              <FaceCamera onDescriptor={handleEnrollFace} busy={enrollBusy} actionLabel="Capture & Save Face" />
+
+              {enrollVoter.face_encoding && (
+                <Button
+                  variant="outline"
+                  onClick={() => removeFace(enrollVoter)}
+                  disabled={enrollBusy}
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                >
+                  Remove enrolled face
+                </Button>
+              )}
+              <p className="text-center text-xs text-muted-foreground">
+                Ask the student to look straight at the camera in good lighting.
+              </p>
             </div>
           )}
         </DialogContent>

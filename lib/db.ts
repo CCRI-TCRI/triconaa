@@ -49,6 +49,13 @@ export const userDb = {
     if (error) { console.error("userDb.resetAllVotes:", error.message); return false }
     return true
   },
+
+  // Store (or clear) a voter's face descriptor for facial recognition login
+  setFaceEncoding: async (id: string, encoding: string | null): Promise<boolean> => {
+    const { error } = await supabase.from("users").update({ face_encoding: encoding }).eq("id", id)
+    if (error) { console.error("userDb.setFaceEncoding:", error.message); return false }
+    return true
+  },
 }
 
 // ── Candidates ────────────────────────────────────────────────
