@@ -3,28 +3,29 @@
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { Vote, CheckCircle2, Star, Award, Crown, Megaphone, Sparkles, Trophy, type LucideIcon } from "lucide-react"
 
-// Decorative emojis that drift across the intro
-const FLOATERS = [
-  { e: "🗳️", left: "8%", top: "18%", d: 0, dur: 7, size: 40 },
-  { e: "✅", left: "82%", top: "22%", d: 0.6, dur: 8, size: 34 },
-  { e: "⭐", left: "16%", top: "70%", d: 1.1, dur: 6.5, size: 28 },
-  { e: "🎉", left: "75%", top: "68%", d: 0.3, dur: 7.5, size: 38 },
-  { e: "👑", left: "46%", top: "12%", d: 0.9, dur: 9, size: 30 },
-  { e: "📣", left: "30%", top: "82%", d: 1.4, dur: 8, size: 30 },
-  { e: "✨", left: "90%", top: "50%", d: 0.5, dur: 6, size: 24 },
-  { e: "🏆", left: "5%", top: "45%", d: 1.2, dur: 8.5, size: 30 },
+// Decorative icons that drift across the intro
+const FLOATERS: { Icon: LucideIcon; left: string; top: string; d: number; dur: number; size: number; color: string }[] = [
+  { Icon: Vote, left: "8%", top: "18%", d: 0, dur: 7, size: 44, color: "text-amber-300/80" },
+  { Icon: CheckCircle2, left: "82%", top: "22%", d: 0.6, dur: 8, size: 36, color: "text-emerald-300/70" },
+  { Icon: Star, left: "16%", top: "70%", d: 1.1, dur: 6.5, size: 28, color: "text-amber-200/70" },
+  { Icon: Trophy, left: "75%", top: "68%", d: 0.3, dur: 7.5, size: 38, color: "text-amber-300/70" },
+  { Icon: Crown, left: "46%", top: "12%", d: 0.9, dur: 9, size: 32, color: "text-amber-300/80" },
+  { Icon: Megaphone, left: "30%", top: "82%", d: 1.4, dur: 8, size: 32, color: "text-sky-300/70" },
+  { Icon: Sparkles, left: "90%", top: "50%", d: 0.5, dur: 6, size: 26, color: "text-white/60" },
+  { Icon: Award, left: "5%", top: "45%", d: 1.2, dur: 8.5, size: 32, color: "text-sky-300/70" },
 ]
 
 export function ElectionIntro({ onComplete }: { onComplete: () => void }) {
   const { schoolName, logoUrl } = useSchoolBranding()
   const year = new Date().getFullYear()
 
-  const steps = [
-    { big: "DECISION", small: String(year), emoji: "🗳️" },
-    { big: "EVERY VOICE", small: "COUNTS", emoji: "📣" },
-    { big: "EVERY VOTE", small: "MATTERS", emoji: "✅" },
-    { big: schoolName, small: "STUDENT LEADERSHIP ELECTIONS", emoji: "👑", brand: true },
+  const steps: { big: string; small: string; Icon: LucideIcon; brand?: boolean }[] = [
+    { big: "DECISION", small: String(year), Icon: Vote },
+    { big: "EVERY VOICE", small: "COUNTS", Icon: Megaphone },
+    { big: "EVERY VOTE", small: "MATTERS", Icon: CheckCircle2 },
+    { big: schoolName, small: "STUDENT LEADERSHIP ELECTIONS", Icon: Crown, brand: true },
   ]
 
   const [i, setI] = useState(0)
@@ -49,6 +50,7 @@ export function ElectionIntro({ onComplete }: { onComplete: () => void }) {
   }, [i, closing])
 
   const step = steps[Math.min(i, steps.length - 1)]
+  const StepIcon = step.Icon
 
   return (
     <motion.div
@@ -71,18 +73,21 @@ export function ElectionIntro({ onComplete }: { onComplete: () => void }) {
         transition={{ duration: 7, repeat: Infinity, delay: 1 }}
       />
 
-      {/* Floating mascots */}
-      {FLOATERS.map((f, idx) => (
-        <motion.div
-          key={idx}
-          className="pointer-events-none absolute select-none"
-          style={{ left: f.left, top: f.top, fontSize: f.size }}
-          animate={{ y: [0, -22, 0], rotate: [0, 8, -8, 0], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: f.dur, repeat: Infinity, ease: "easeInOut", delay: f.d }}
-        >
-          {f.e}
-        </motion.div>
-      ))}
+      {/* Floating decorative icons */}
+      {FLOATERS.map((f, idx) => {
+        const Icon = f.Icon
+        return (
+          <motion.div
+            key={idx}
+            className={`pointer-events-none absolute ${f.color}`}
+            style={{ left: f.left, top: f.top }}
+            animate={{ y: [0, -22, 0], rotate: [0, 8, -8, 0], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: f.dur, repeat: Infinity, ease: "easeInOut", delay: f.d }}
+          >
+            <Icon style={{ width: f.size, height: f.size }} strokeWidth={1.5} />
+          </motion.div>
+        )
+      })}
 
       {/* Zoom-through text */}
       <div className="relative flex flex-col items-center px-6 text-center">
@@ -105,13 +110,13 @@ export function ElectionIntro({ onComplete }: { onComplete: () => void }) {
                 <img src={logoUrl} alt={schoolName} className="h-20 w-20 object-contain" />
               </motion.div>
             )}
-            <motion.span
+            <motion.div
               animate={{ scale: [1, 1.12, 1] }}
               transition={{ duration: 1.4, repeat: Infinity }}
-              className="mb-3 text-5xl drop-shadow-lg sm:text-6xl"
+              className="mb-4 text-amber-300 drop-shadow-lg"
             >
-              {step.emoji}
-            </motion.span>
+              <StepIcon className="h-12 w-12 sm:h-16 sm:w-16" strokeWidth={1.5} />
+            </motion.div>
             <h1 className="bg-gradient-to-r from-amber-200 via-white to-amber-200 bg-clip-text text-4xl font-black uppercase leading-none tracking-tight text-transparent drop-shadow-2xl sm:text-7xl">
               {step.big}
             </h1>
