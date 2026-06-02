@@ -4,9 +4,11 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { positionDb, candidateDb, voteDb, userDb, getPositionsWithCandidates } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
-import { FileText, Users, Vote, UserSquare, FileDown, Eye, Loader2, X } from "lucide-react"
+import { FileText, Users, Vote, UserSquare, FileDown, Eye, Loader2, X, CalendarRange } from "lucide-react"
 
 interface ReportSpec {
   title: string
@@ -16,6 +18,7 @@ interface ReportSpec {
   intro?: string[]
   columnStyles?: Record<number, any>
   statusCol?: number // column index whose Voted/Yes value is coloured green
+  chart?: { title: string; data: { label: string; value: number }[] }
 }
 
 export default function ReportsPage() {
@@ -25,6 +28,8 @@ export default function ReportsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewTitle, setPreviewTitle] = useState("")
   const [filename, setFilename] = useState("report.pdf")
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
   const docRef = useRef<any>(null)
 
   // ── Report data builders ─────────────────────────────────────
@@ -35,12 +40,14 @@ export default function ReportsPage() {
       userDb.getAll(),
     ])
     const voted = users.filter((u) => u.has_voted).length
+    const chartData: { label: string; value: number }[] = []
     const body = positions.map((position) => {
       const positionVotes = votes.filter((v) => v.position_id === position.id)
       const ranked = position.candidates
         .map((c) => ({ name: c.full_name, count: positionVotes.filter((v) => v.candidate_id === c.id).length }))
         .sort((a, b) => b.count - a.count)
       const winner = ranked[0]
+      chartData.push({ label: position.name, value: positionVotes.length })
       return [
         position.name,
         position.category,
@@ -58,6 +65,7 @@ export default function ReportsPage() {
         `Total votes cast: ${votes.length}`,
         `Turnout: ${users.length > 0 ? ((voted / users.length) * 100).toFixed(1) : "0"}%  (${voted}/${users.length})`,
       ],
+      chart: { title: "Votes by Position", data: chartData },
       head: ["Position", "Category", "Cand.", "Votes", "Winner", "Winner Votes"],
       body,
       columnStyles: { 2: { halign: "center", cellWidth: 42 }, 3: { halign: "center", cellWidth: 48 }, 5: { halign: "center", cellWidth: 70 } },
@@ -74,7 +82,17 @@ export default function ReportsPage() {
     const userMap = new Map(users.map((u) => [u.id, u]))
     const candMap = new Map(candidates.map((c) => [c.id, c.full_name]))
     const posMap = new Map(positions.map((p) => [p.id, p.name]))
-    const body = votes.map((vote, i) => [
+
+    const from = fromDate ? new Date(fromDate).getTime() : null
+    const to = toDate ? new Date(toDate).getTime() : null
+    const filtered = votes.filter((v) => {
+      const t = new Date(v.created_at).getTime()
+      if (from != null && t < from) return false
+      if (to != null && t > to) return false
+      return true
+    })
+
+    const body = filtered.map((vote, i) => [
       String(i + 1),
       userMap.get(vote.user_id)?.voting_code || "—",
       userMap.get(vote.user_id)?.full_name || "Unknown",
@@ -82,10 +100,18 @@ export default function ReportsPage() {
       posMap.get(vote.position_id) || "Unknown",
       new Date(vote.created_at).toLocaleString(),
     ])
+
+    const intro = [`Vote records: ${filtered.length}${filtered.length !== votes.length ? ` (of ${votes.length} total)` : ""}`]
+    if (from != null || to != null) {
+      intro.push(
+        `Range: ${from != null ? new Date(from).toLocaleString() : "start"} → ${to != null ? new Date(to).toLocaleString() : "now"}`,
+      )
+    }
+
     return {
       title: "Detailed Vote Records",
       filenameBase: "election-detailed",
-      intro: [`Total vote records: ${votes.length}`],
+      intro,
       head: ["#", "Voter Code", "Voter Name", "Candidate", "Position", "Time"],
       body,
       columnStyles: { 0: { cellWidth: 32, halign: "center" }, 1: { cellWidth: 70 } },
@@ -250,7 +276,39 @@ export default function ReportsPage() {
         doc.text(linex, M, startY)
       })
     }
-    startY += 12
+    startY += 18
+
+    // Optional horizontal bar chart
+    if (spec.chart && spec.chart.data.length) {
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(11)
+      doc.setTextColor(...ink)
+      doc.text(spec.chart.title, M, startY)
+      startY += 12
+      const data = spec.chart.data.slice(0, 10)
+      const max = Math.max(1, ...data.map((d) => d.value))
+      const labelW = 130
+      const valW = 36
+      const barMaxW = pageW - M * 2 - labelW - valW
+      const rowH = 15
+      data.forEach((d) => {
+        const y = startY
+        doc.setFont("helvetica", "normal")
+        doc.setFontSize(8)
+        doc.setTextColor(...ink)
+        const label = d.label.length > 28 ? d.label.slice(0, 26) + "…" : d.label
+        doc.text(label, M, y + 8)
+        doc.setFillColor(236, 230, 231)
+        doc.roundedRect(M + labelW, y, barMaxW, 9, 2, 2, "F")
+        const w = Math.max(2, (barMaxW * d.value) / max)
+        doc.setFillColor(...maroon)
+        doc.roundedRect(M + labelW, y, w, 9, 2, 2, "F")
+        doc.setTextColor(...muted)
+        doc.text(String(d.value), M + labelW + barMaxW + 6, y + 8)
+        startY += rowH
+      })
+      startY += 16
+    }
 
     autoTable(doc, {
       head: [spec.head],
@@ -338,6 +396,37 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Detailed report date filter */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarRange className="h-4 w-4 text-rose-700" />
+            Detailed report filter <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+          </CardTitle>
+          <CardDescription>Limit the Detailed Report to votes cast within a time range.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <Label htmlFor="from" className="text-xs">From</Label>
+            <Input id="from" type="datetime-local" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </div>
+          <div className="flex-1">
+            <Label htmlFor="to" className="text-xs">To</Label>
+            <Input id="to" type="datetime-local" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setFromDate("")
+              setToDate("")
+            }}
+            disabled={!fromDate && !toDate}
+          >
+            Clear
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {reports.map((r) => (
