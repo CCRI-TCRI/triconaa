@@ -28,6 +28,7 @@ import {
   Shield,
   LogOut,
   School,
+  Briefcase,
 } from "lucide-react"
 
 const menuItems = [
@@ -49,6 +50,11 @@ const menuItems = [
   {
     title: "Election Management",
     items: [
+      {
+        title: "Positions",
+        url: "/admin/positions",
+        icon: Briefcase,
+      },
       {
         title: "Voters",
         url: "/admin/voters",
