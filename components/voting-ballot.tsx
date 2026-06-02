@@ -35,6 +35,61 @@ interface VotingBallotProps {
 
 const MAROON = "#7a1f2b"
 
+const formatTime = (seconds: number) => {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+// Module-level so it keeps a stable identity — otherwise the whole ballot would
+// remount (and animations/inputs would reset) on every timer tick.
+function BallotShell({
+  schoolName,
+  motto,
+  logoUrl,
+  timeLeft,
+  children,
+}: {
+  schoolName: string
+  motto: string
+  logoUrl: string
+  timeLeft: number
+  children: React.ReactNode
+}) {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#fdf7f2] via-[#fbeee6] to-[#f1d9c8]">
+      {/* Header */}
+      <header className="sticky top-0 z-20 border-b border-rose-900/10 bg-gradient-to-r from-[#5c0f1f] via-[#7a1f2b] to-[#5c0f1f] text-white shadow-lg">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-2 ring-amber-300/50">
+              <img src={logoUrl} alt={schoolName} className="h-9 w-9 object-contain" />
+            </div>
+            <div className="leading-tight">
+              <h1 className="text-sm font-bold sm:text-base">{schoolName}</h1>
+              <p className="text-[11px] italic text-amber-200/90">"{motto}" · Official Ballot</p>
+            </div>
+          </div>
+          <div
+            className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums ${
+              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/15 text-amber-100 ring-1 ring-white/20"
+            }`}
+          >
+            <Clock className="h-4 w-4" />
+            {formatTime(timeLeft)}
+            {timeLeft <= 60 && (
+              <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                <AlertTriangle className="h-4 w-4" />
+              </motion.span>
+            )}
+          </div>
+        </div>
+      </header>
+      <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+    </div>
+  )
+}
+
 export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const { schoolName, motto, logoUrl } = useSchoolBranding()
   const [positions, setPositions] = useState<PositionWithCandidates[]>([])
@@ -155,12 +210,6 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
     return <User className={className} />
   }
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60)
-    const s = seconds % 60
-    return `${m}:${s.toString().padStart(2, "0")}`
-  }
-
   const initials = (name: string) =>
     name
       .split(" ")
@@ -169,54 +218,21 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
       .join("")
 
   // ── Shared chrome ───────────────────────────────────────────
-  const PageShell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdf7f2] via-[#fbeee6] to-[#f1d9c8]">
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-rose-900/10 bg-gradient-to-r from-[#5c0f1f] via-[#7a1f2b] to-[#5c0f1f] text-white shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-2 ring-amber-300/50">
-              <img src={logoUrl} alt={schoolName} className="h-9 w-9 object-contain" />
-            </div>
-            <div className="leading-tight">
-              <h1 className="text-sm font-bold sm:text-base">{schoolName}</h1>
-              <p className="text-[11px] italic text-amber-200/90">"{motto}" · Official Ballot</p>
-            </div>
-          </div>
-          <div
-            className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums ${
-              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/15 text-amber-100 ring-1 ring-white/20"
-            }`}
-          >
-            <Clock className="h-4 w-4" />
-            {formatTime(timeLeft)}
-            {timeLeft <= 60 && (
-              <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-                <AlertTriangle className="h-4 w-4" />
-              </motion.span>
-            )}
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
-    </div>
-  )
-
   if (isLoading) {
     return (
-      <PageShell>
+      <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
         <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
           <Loader2 className="mb-4 h-12 w-12 animate-spin" style={{ color: MAROON }} />
           <h2 className="text-xl font-bold text-rose-900">Preparing your ballot…</h2>
           <p className="mt-1 text-rose-800/60">Fetching candidates, please wait.</p>
         </div>
-      </PageShell>
+      </BallotShell>
     )
   }
 
   if (!currentPosition || positions.length === 0) {
     return (
-      <PageShell>
+      <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
         <div className="mx-auto mt-10 max-w-md rounded-2xl border border-rose-900/10 bg-white p-8 text-center shadow-xl">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
             <AlertTriangle className="h-8 w-8 text-amber-600" />
@@ -229,14 +245,14 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             Refresh Page
           </Button>
         </div>
-      </PageShell>
+      </BallotShell>
     )
   }
 
   // ── Confirmation (ballot receipt) ───────────────────────────
   if (showConfirmation) {
     return (
-      <PageShell>
+      <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -313,7 +329,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             </div>
           </div>
         </motion.div>
-      </PageShell>
+      </BallotShell>
     )
   }
 
@@ -321,7 +337,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const progressPct = Math.round((votedCount / positions.length) * 100)
 
   return (
-    <PageShell>
+    <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
       {/* Stepper */}
       <div className="mb-5">
         <div className="mb-2 flex items-center justify-between text-xs font-medium text-rose-800/70">
@@ -458,6 +474,6 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
           </div>
         </motion.div>
       </AnimatePresence>
-    </PageShell>
+    </BallotShell>
   )
 }
