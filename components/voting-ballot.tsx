@@ -57,22 +57,22 @@ function BallotShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdf7f2] via-[#fbeee6] to-[#f1d9c8]">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-100">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-rose-900/10 bg-gradient-to-r from-[#5c0f1f] via-[#7a1f2b] to-[#5c0f1f] text-white shadow-lg">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3">
+      <header className="flex-none bg-gradient-to-r from-[#5c0f1f] via-[#7a1f2b] to-[#5c0f1f] text-white shadow-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-2 ring-amber-300/50">
-              <img src={logoUrl} alt={schoolName} className="h-9 w-9 object-contain" />
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-amber-300/40">
+              <img src={logoUrl} alt={schoolName} className="h-8 w-8 object-contain" />
             </div>
             <div className="leading-tight">
-              <h1 className="text-sm font-bold sm:text-base">{schoolName}</h1>
-              <p className="text-[11px] italic text-amber-200/90">"{motto}" · Official Ballot</p>
+              <h1 className="text-sm font-semibold sm:text-base">{schoolName}</h1>
+              <p className="text-[11px] text-amber-200/80">"{motto}" · Official Ballot</p>
             </div>
           </div>
           <div
-            className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold tabular-nums ${
-              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/15 text-amber-100 ring-1 ring-white/20"
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold tabular-nums ${
+              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-amber-100 ring-1 ring-white/15"
             }`}
           >
             <Clock className="h-4 w-4" />
@@ -85,7 +85,7 @@ function BallotShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+      <main className="min-h-0 flex-1">{children}</main>
     </div>
   )
 }
@@ -221,10 +221,10 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   if (isLoading) {
     return (
       <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-          <Loader2 className="mb-4 h-12 w-12 animate-spin" style={{ color: MAROON }} />
-          <h2 className="text-xl font-bold text-rose-900">Preparing your ballot…</h2>
-          <p className="mt-1 text-rose-800/60">Fetching candidates, please wait.</p>
+        <div className="flex h-full flex-col items-center justify-center text-center">
+          <Loader2 className="mb-4 h-10 w-10 animate-spin" style={{ color: MAROON }} />
+          <h2 className="text-lg font-semibold text-slate-800">Preparing your ballot…</h2>
+          <p className="mt-1 text-sm text-slate-500">Fetching candidates, please wait.</p>
         </div>
       </BallotShell>
     )
@@ -233,17 +233,19 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   if (!currentPosition || positions.length === 0) {
     return (
       <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
-        <div className="mx-auto mt-10 max-w-md rounded-2xl border border-rose-900/10 bg-white p-8 text-center shadow-xl">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-            <AlertTriangle className="h-8 w-8 text-amber-600" />
+        <div className="flex h-full items-center justify-center p-4">
+          <div className="max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+              <AlertTriangle className="h-7 w-7 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900">No Candidates Available</h2>
+            <p className="mb-6 mt-2 text-sm text-slate-500">
+              There are currently no candidates available for voting. Please contact the election committee.
+            </p>
+            <Button onClick={() => window.location.reload()} className="bg-[#7a1f2b] text-white hover:bg-[#5c0f1f]">
+              Refresh Page
+            </Button>
           </div>
-          <h2 className="text-2xl font-bold text-rose-900">No Candidates Available</h2>
-          <p className="mb-6 mt-2 text-gray-600">
-            There are currently no candidates available for voting. Please contact the election committee.
-          </p>
-          <Button onClick={() => window.location.reload()} className="bg-[#7a1f2b] text-white hover:bg-[#5c0f1f]">
-            Refresh Page
-          </Button>
         </div>
       </BallotShell>
     )
@@ -253,82 +255,86 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   if (showConfirmation) {
     return (
       <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-rose-900/10 bg-white shadow-2xl"
-        >
-          <div className="border-b border-dashed border-rose-900/20 bg-gradient-to-b from-rose-50 to-white px-8 py-6 text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 shadow">
-              <ShieldCheck className="h-7 w-7 text-rose-950" />
+        <div className="h-full overflow-y-auto px-4 py-4">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#7a1f2b]/10">
+                <ShieldCheck className="h-6 w-6 text-[#7a1f2b]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Review Your Ballot</h2>
+                <p className="text-xs text-slate-500">Confirm your selections before casting · {formatTime(timeLeft)} left</p>
+              </div>
             </div>
-            <h2 className="font-serif text-2xl font-bold text-rose-900">Review Your Ballot</h2>
-            <p className="mt-1 text-sm text-gray-500">Confirm your selections before casting · {formatTime(timeLeft)} left</p>
-          </div>
 
-          <div className="divide-y divide-gray-100 px-6 py-2">
-            {positions.map((position, i) => {
-              const selectedCandidate = position.candidates.find((c) => c.id === votes[position.id])
-              return (
-                <div key={position.id} className="flex items-center justify-between gap-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-serif text-sm font-bold text-rose-300">{String(i + 1).padStart(2, "0")}</span>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">{position.name}</p>
-                      {selectedCandidate ? (
-                        <p className="font-semibold text-gray-900">{selectedCandidate.full_name}</p>
-                      ) : (
-                        <p className="font-semibold text-amber-600">No selection</p>
-                      )}
+            <div className="divide-y divide-slate-100">
+              {positions.map((position, i) => {
+                const selectedCandidate = position.candidates.find((c) => c.id === votes[position.id])
+                return (
+                  <div key={position.id} className="flex items-center justify-between gap-4 px-6 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 text-sm font-semibold tabular-nums text-slate-300">{String(i + 1).padStart(2, "0")}</span>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400">{position.name}</p>
+                        {selectedCandidate ? (
+                          <p className="font-semibold text-slate-900">{selectedCandidate.full_name}</p>
+                        ) : (
+                          <p className="font-semibold text-amber-600">No selection</p>
+                        )}
+                      </div>
                     </div>
+                    {selectedCandidate && (
+                      <Avatar className="h-9 w-9 ring-1 ring-slate-200">
+                        <AvatarImage src={selectedCandidate.photo_url || "/placeholder.svg"} />
+                        <AvatarFallback className="bg-[#7a1f2b] text-xs text-white">
+                          {initials(selectedCandidate.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                  {selectedCandidate && (
-                    <Avatar className="h-9 w-9 ring-2 ring-rose-200">
-                      <AvatarImage src={selectedCandidate.photo_url || "/placeholder.svg"} />
-                      <AvatarFallback className="bg-[#7a1f2b] text-xs text-white">
-                        {initials(selectedCandidate.full_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="space-y-3 px-6 pb-6 pt-3">
-            <p className="rounded-lg bg-amber-50 px-4 py-2.5 text-center text-sm text-amber-800">
-              Once cast, your voting token cannot be used again.
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                onClick={() => setShowConfirmation(false)}
-                variant="outline"
-                disabled={isSubmitting}
-                className="border-rose-200 text-rose-800 hover:bg-rose-50 sm:w-1/3"
-              >
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <Button
-                onClick={submitVotes}
-                disabled={isSubmitting}
-                className="flex-1 bg-gradient-to-r from-[#7a1f2b] to-[#5c0f1f] font-semibold text-white shadow-lg hover:from-[#8d2533] hover:to-[#6b1226]"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Casting Ballot…
-                  </>
-                ) : (
-                  <>
-                    <ScrollText className="mr-2 h-4 w-4" />
-                    Cast My Ballot
-                  </>
-                )}
-              </Button>
+                )
+              })}
             </div>
-          </div>
-        </motion.div>
+
+            <div className="space-y-3 border-t border-slate-100 px-6 py-4">
+              <p className="rounded-md bg-slate-50 px-4 py-2 text-center text-xs text-slate-500">
+                Once cast, your voting token cannot be used again.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  onClick={() => setShowConfirmation(false)}
+                  variant="outline"
+                  disabled={isSubmitting}
+                  className="border-slate-200 text-slate-700 hover:bg-slate-50 sm:w-1/3"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button
+                  onClick={submitVotes}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-[#7a1f2b] font-semibold text-white shadow-sm hover:bg-[#5c0f1f]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Casting Ballot…
+                    </>
+                  ) : (
+                    <>
+                      <ScrollText className="mr-2 h-4 w-4" />
+                      Cast My Ballot
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </BallotShell>
     )
   }
@@ -338,142 +344,142 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
 
   return (
     <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
-      {/* Stepper */}
-      <div className="mb-5">
-        <div className="mb-2 flex items-center justify-between text-xs font-medium text-rose-800/70">
-          <span>
-            Position {currentPositionIndex + 1} of {positions.length}
-          </span>
-          <span>{progressPct}% complete</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {positions.map((position, index) => {
-            const hasVote = !!votes[position.id]
-            const isActive = index === currentPositionIndex
-            const locked = isPositionLocked(index)
-            return (
-              <button
-                key={position.id}
-                onClick={() => handlePositionClick(index)}
-                disabled={locked}
-                title={position.name}
-                className={`h-2 flex-1 rounded-full transition-all ${
-                  isActive
-                    ? "bg-[#7a1f2b]"
-                    : hasVote
-                      ? "bg-amber-400"
-                      : locked
-                        ? "cursor-not-allowed bg-rose-900/10"
-                        : "bg-rose-900/20 hover:bg-rose-900/30"
-                }`}
-              />
-            )
-          })}
-        </div>
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentPositionIndex}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -16 }}
-          transition={{ duration: 0.35 }}
-          className="overflow-hidden rounded-2xl border border-rose-900/10 bg-white shadow-xl"
-        >
-          {/* Ballot title block */}
-          <div className="border-b border-dashed border-rose-900/15 bg-gradient-to-b from-rose-50/70 to-white px-6 py-5 text-center sm:px-8">
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#7a1f2b]/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#7a1f2b]">
-              {getCategoryIcon(currentPosition.category, "w-4 h-4")}
-              {currentPosition.category}
-            </div>
-            <h2 className="font-serif text-3xl font-bold text-rose-900 sm:text-4xl">{currentPosition.name}</h2>
-            {currentPosition.description && (
-              <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">{currentPosition.description}</p>
-            )}
-            <p className="mt-2 text-xs text-rose-800/50">Select one candidate to continue</p>
+      <div className="mx-auto flex h-full max-w-5xl flex-col px-3 py-3 sm:px-4">
+        {/* Stepper */}
+        <div className="mb-3 flex-none">
+          <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>
+              Position {currentPositionIndex + 1} of {positions.length}
+            </span>
+            <span>{progressPct}% complete</span>
           </div>
-
-          {/* Candidate options */}
-          <div className="space-y-3 p-4 sm:p-6">
-            {currentPosition.candidates.map((candidate, index) => {
-              const selected = votes[currentPosition.id] === candidate.id
+          <div className="flex items-center gap-1">
+            {positions.map((position, index) => {
+              const hasVote = !!votes[position.id]
+              const isActive = index === currentPositionIndex
+              const locked = isPositionLocked(index)
               return (
-                <motion.button
-                  key={candidate.id}
-                  type="button"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06 }}
-                  onClick={() => handleVote(candidate.id)}
-                  disabled={isTransitioning}
-                  className={`flex w-full items-start gap-4 rounded-xl border-2 p-4 text-left transition-all ${
-                    selected
-                      ? "border-[#7a1f2b] bg-rose-50 shadow-md"
-                      : "border-gray-200 bg-white hover:border-amber-400 hover:bg-amber-50/40 hover:shadow"
-                  } ${isTransitioning ? "pointer-events-none" : ""}`}
-                >
-                  {/* radio */}
-                  <div
-                    className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                      selected ? "border-[#7a1f2b] bg-[#7a1f2b]" : "border-gray-300 bg-white"
-                    }`}
-                  >
-                    {selected && <Check className="h-4 w-4 text-white" />}
-                  </div>
-
-                  <Avatar className={`h-14 w-14 shrink-0 ring-2 ${selected ? "ring-[#7a1f2b]" : "ring-gray-200"}`}>
-                    <AvatarImage src={candidate.photo_url || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-gradient-to-br from-[#7a1f2b] to-[#5c0f1f] font-semibold text-white">
-                      {initials(candidate.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
-                      <h3 className="text-lg font-bold text-gray-900">{candidate.full_name}</h3>
-                      <span className="text-sm text-gray-500">{candidate.class}</span>
-                    </div>
-                    <p className="text-xs text-gray-400">ID: {candidate.student_id}</p>
-                    <p className="mt-1.5 line-clamp-2 text-sm text-gray-600">
-                      {candidate.manifesto || "No manifesto provided."}
-                    </p>
-                  </div>
-                </motion.button>
+                <button
+                  key={position.id}
+                  onClick={() => handlePositionClick(index)}
+                  disabled={locked}
+                  title={position.name}
+                  className={`h-1.5 flex-1 rounded-full transition-all ${
+                    isActive
+                      ? "bg-[#7a1f2b]"
+                      : hasVote
+                        ? "bg-[#7a1f2b]/50"
+                        : locked
+                          ? "cursor-not-allowed bg-slate-200"
+                          : "bg-slate-200 hover:bg-slate-300"
+                  }`}
+                />
               )
             })}
           </div>
+        </div>
 
-          {/* Nav */}
-          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-4 sm:px-6">
-            <Button
-              onClick={() => setCurrentPositionIndex(Math.max(0, currentPositionIndex - 1))}
-              disabled={currentPositionIndex === 0}
-              variant="ghost"
-              className="text-rose-800 hover:bg-rose-50 disabled:opacity-40"
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Previous
-            </Button>
-            <Button
-              onClick={() => {
-                if (votes[currentPosition.id]) {
-                  const next = currentPositionIndex + 1
-                  if (next < positions.length) setCurrentPositionIndex(next)
-                  else setShowConfirmation(true)
-                } else {
-                  toast.info("Please select a candidate first")
-                }
-              }}
-              disabled={!votes[currentPosition.id]}
-              className="bg-[#7a1f2b] font-semibold text-white hover:bg-[#5c0f1f] disabled:opacity-40"
-            >
-              {currentPositionIndex === positions.length - 1 ? "Review Ballot" : "Next"}
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPositionIndex}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.25 }}
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            {/* Title block */}
+            <div className="flex flex-none items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+              <div className="min-w-0">
+                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-[#7a1f2b]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#7a1f2b]">
+                  {getCategoryIcon(currentPosition.category, "w-3.5 h-3.5")}
+                  {currentPosition.category}
+                </div>
+                <h2 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">{currentPosition.name}</h2>
+              </div>
+              <span className="hidden flex-none text-xs text-slate-400 sm:block">Select one candidate</span>
+            </div>
+
+            {/* Candidate options (scrolls) */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {currentPosition.candidates.map((candidate) => {
+                  const selected = votes[currentPosition.id] === candidate.id
+                  return (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => handleVote(candidate.id)}
+                      disabled={isTransitioning}
+                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+                        selected
+                          ? "border-[#7a1f2b] bg-[#7a1f2b]/5 ring-1 ring-[#7a1f2b]"
+                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                      } ${isTransitioning ? "pointer-events-none" : ""}`}
+                    >
+                      <div
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                          selected ? "border-[#7a1f2b] bg-[#7a1f2b]" : "border-slate-300 bg-white"
+                        }`}
+                      >
+                        {selected && <Check className="h-3.5 w-3.5 text-white" />}
+                      </div>
+
+                      <Avatar className={`h-12 w-12 shrink-0 ${selected ? "ring-2 ring-[#7a1f2b]" : "ring-1 ring-slate-200"}`}>
+                        <AvatarImage src={candidate.photo_url || "/placeholder.svg"} />
+                        <AvatarFallback className="bg-[#7a1f2b] text-sm font-semibold text-white">
+                          {initials(candidate.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <h3 className="truncate font-semibold text-slate-900">{candidate.full_name}</h3>
+                          <span className="shrink-0 text-xs text-slate-400">{candidate.class}</span>
+                        </div>
+                        <p className="line-clamp-2 text-xs leading-snug text-slate-500">
+                          {candidate.manifesto || "No manifesto provided."}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Nav */}
+            <div className="flex flex-none items-center justify-between border-t border-slate-100 px-4 py-2.5">
+              <Button
+                onClick={() => setCurrentPositionIndex(Math.max(0, currentPositionIndex - 1))}
+                disabled={currentPositionIndex === 0}
+                variant="ghost"
+                size="sm"
+                className="text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+              >
+                <ChevronLeft className="mr-1.5 h-4 w-4" />
+                Previous
+              </Button>
+              <Button
+                onClick={() => {
+                  if (votes[currentPosition.id]) {
+                    const next = currentPositionIndex + 1
+                    if (next < positions.length) setCurrentPositionIndex(next)
+                    else setShowConfirmation(true)
+                  } else {
+                    toast.info("Please select a candidate first")
+                  }
+                }}
+                disabled={!votes[currentPosition.id]}
+                size="sm"
+                className="bg-[#7a1f2b] font-semibold text-white hover:bg-[#5c0f1f] disabled:opacity-40"
+              >
+                {currentPositionIndex === positions.length - 1 ? "Review Ballot" : "Next"}
+                <ChevronRight className="ml-1.5 h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </BallotShell>
   )
 }
