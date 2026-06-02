@@ -29,6 +29,7 @@ import {
   LogOut,
   School,
   Briefcase,
+  Sparkles,
 } from "lucide-react"
 
 const menuItems = [
@@ -79,6 +80,11 @@ const menuItems = [
         title: "Live Results",
         url: "/admin/results",
         icon: Trophy,
+      },
+      {
+        title: "Reveal Show",
+        url: "/admin/reveal",
+        icon: Sparkles,
       },
       {
         title: "Analytics",
