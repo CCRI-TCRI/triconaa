@@ -222,3 +222,61 @@ export const electionControl = {
     return true
   },
 }
+
+// ── Emergency / voice-code broadcast ──────────────────────────
+
+export type AnnounceCode = "3" | "5" | "7" | "9"
+
+export interface BroadcastState {
+  code: AnnounceCode | null
+  announceAt: string | null
+  lockdown: boolean
+  code5Interval: number
+}
+
+export const broadcastDb = {
+  get: async (): Promise<BroadcastState> => {
+    const { data } = await supabase
+      .from("election_settings")
+      .select("announce_code, announce_at, lockdown, code5_interval")
+      .limit(1)
+      .single()
+    return {
+      code: (data?.announce_code as AnnounceCode) || null,
+      announceAt: data?.announce_at || null,
+      lockdown: !!data?.lockdown,
+      code5Interval: data?.code5_interval ?? 0,
+    }
+  },
+
+  // Trigger a code: bumps announce_at so listeners play the audio + show the banner
+  trigger: async (code: AnnounceCode): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase
+      .from("election_settings")
+      .update({ announce_code: code, announce_at: new Date().toISOString() })
+      .eq("id", row.id)
+    if (error) { console.error("broadcastDb.trigger:", error.message); return false }
+    return true
+  },
+
+  setLockdown: async (on: boolean): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const update = on
+      ? { lockdown: true, announce_code: "7", announce_at: new Date().toISOString() }
+      : { lockdown: false }
+    const { error } = await supabase.from("election_settings").update(update).eq("id", row.id)
+    if (error) { console.error("broadcastDb.setLockdown:", error.message); return false }
+    return true
+  },
+
+  setCode5Interval: async (minutes: number): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ code5_interval: minutes }).eq("id", row.id)
+    if (error) { console.error("broadcastDb.setCode5Interval:", error.message); return false }
+    return true
+  },
+}

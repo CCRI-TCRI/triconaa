@@ -11,6 +11,8 @@ import { AdminAccessButton } from "@/components/admin-access-button"
 import { SeasonalIntro } from "@/components/seasonal-intro"
 import { ElectionClosedScreen } from "@/components/election-closed-screen"
 import { WinnersScreen } from "@/components/winners-screen"
+import { LockdownScreen } from "@/components/lockdown-screen"
+import { useEmergency } from "@/components/emergency-broadcast"
 import { motion } from "framer-motion"
 import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,6 +24,7 @@ type AppState = "auth" | "tutorial" | "voting" | "complete"
 
 export default function VotingApp() {
   const { schoolName, logoUrl, seasonalTheme, electionStatus } = useSchoolBranding()
+  const { lockdown } = useEmergency()
   const [appState, setAppState] = useState<AppState>("auth")
   const [studentId, setStudentId] = useState("")
   const [studentName, setStudentName] = useState("")
@@ -83,6 +86,9 @@ export default function VotingApp() {
     setShowTutorial(false)
     setShowHolidayGreeting(false)
   }
+
+  // Emergency lockdown overrides everything on the public app
+  if (lockdown) return <LockdownScreen />
 
   if (appState === "auth") {
     // Election lifecycle gates the public landing page

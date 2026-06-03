@@ -6,6 +6,8 @@ import { motion, AnimatePresence, animate, useMotionValue } from "framer-motion"
 import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
 import type { Candidate } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { useEmergency } from "@/components/emergency-broadcast"
+import { LockdownScreen } from "@/components/lockdown-screen"
 import { Users, TrendingUp, BarChart3, Vote, Activity } from "lucide-react"
 
 interface PositionResult {
@@ -37,6 +39,7 @@ function AnimatedNumber({ value, decimals = 0, suffix = "" }: { value: number; d
 export default function LiveResultsPage() {
   const router = useRouter()
   const { schoolName, logoUrl } = useSchoolBranding()
+  const { lockdown } = useEmergency()
   const [results, setResults] = useState<PositionResult[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [analytics, setAnalytics] = useState({ totalVotes: 0, turnout: 0, totalVoters: 0, votedCount: 0 })
@@ -94,6 +97,8 @@ export default function LiveResultsPage() {
       setLoading(false)
     }
   }
+
+  if (lockdown) return <LockdownScreen />
 
   if (loading || results.length === 0) {
     return (

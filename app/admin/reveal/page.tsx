@@ -5,6 +5,8 @@ import { motion, AnimatePresence, animate, useMotionValue } from "framer-motion"
 import { QRCodeSVG } from "qrcode.react"
 import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { useEmergency } from "@/components/emergency-broadcast"
+import { LockdownScreen } from "@/components/lockdown-screen"
 import { Crown, Play, ChevronRight, Trophy, Users, Smartphone, Download, Sparkles, Loader2 } from "lucide-react"
 
 // School show colours
@@ -80,6 +82,7 @@ type Phase = "lobby" | "countdown" | "racing" | "drumroll" | "revealed" | "final
 
 export default function RevealShowPage() {
   const { schoolName, motto, logoUrl, electionStatus } = useSchoolBranding()
+  const { lockdown } = useEmergency()
   const [races, setRaces] = useState<Race[]>([])
   const [classTurnout, setClassTurnout] = useState<{ cls: string; pct: number; voted: number; total: number }[]>([])
   const [turnout, setTurnout] = useState(0)
@@ -323,6 +326,8 @@ export default function RevealShowPage() {
   }
 
   // ── render ────────────────────────────────────────────────────
+  if (lockdown) return <LockdownScreen />
+
   if (loading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[#0a0610] text-white">

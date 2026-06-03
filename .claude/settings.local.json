@@ -3,7 +3,13 @@
     "allow": [
       "PowerShell(npm install -g vercel)",
       "Bash(gh auth *)",
-      "mcp__7c4ae74d-c860-43ec-b3b7-f1ce209fc0f5__apply_migration"
+      "mcp__7c4ae74d-c860-43ec-b3b7-f1ce209fc0f5__apply_migration",
+      "Read(//root/.claude/uploads/d7aadc62-27e0-4833-9716-f7ca68bbae73/**)",
+      "Bash(mkdir -p public/audio)",
+      "Bash(cp \"/root/.claude/uploads/d7aadc62-27e0-4833-9716-f7ca68bbae73/2f966cca-Code_Three.mp3\" public/audio/code3.mp3)",
+      "Bash(cp \"/root/.claude/uploads/d7aadc62-27e0-4833-9716-f7ca68bbae73/71c4da93-Code_5_instructions.mp3\" public/audio/code5.mp3)",
+      "Bash(cp \"/root/.claude/uploads/d7aadc62-27e0-4833-9716-f7ca68bbae73/8dfe5318-code_7.mp3\" public/audio/code7.mp3)",
+      "Bash(cd /home/user/triconaa; cp \"/root/.claude/uploads/d7aadc62-27e0-4833-9716-f7ca68bbae73/952564ce-airplanedingdong.mp3\" public/audio/chime.mp3 && ls -la public/audio/chime.mp3)"
     ]
   }
 }

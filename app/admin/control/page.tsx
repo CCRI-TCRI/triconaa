@@ -18,8 +18,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles } from "lucide-react"
-import { userDb, voteDb, electionControl, type ElectionStatus } from "@/lib/db"
+import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles, ShieldAlert, Lock, Megaphone, Volume2, Timer } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { userDb, voteDb, electionControl, broadcastDb, type ElectionStatus } from "@/lib/db"
 import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
 
 const STATUS_META: Record<ElectionStatus, { label: string; color: string; desc: string }> = {
@@ -35,6 +37,9 @@ export default function ControlSystemPage() {
   const [stats, setStats] = useState({ totalVoters: 0, votedCount: 0, totalVotes: 0 })
   const [loading, setLoading] = useState(false)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [lockdown, setLockdown] = useState(false)
+  const [code5Interval, setCode5Interval] = useState(0)
+  const [code5Input, setCode5Input] = useState("0")
 
   useEffect(() => {
     refresh()
@@ -42,10 +47,20 @@ export default function ControlSystemPage() {
     return () => clearInterval(interval)
   }, [])
 
+  // Recurring Code 5 announcements while this console is open
+  useEffect(() => {
+    if (code5Interval <= 0) return
+    const id = setInterval(() => broadcastDb.trigger("5"), code5Interval * 60_000)
+    return () => clearInterval(id)
+  }, [code5Interval])
+
   const refresh = async () => {
-    const { status, term } = await electionControl.get()
+    const [{ status, term }, b] = await Promise.all([electionControl.get(), broadcastDb.get()])
     setStatus(status)
     setTerm(term)
+    setLockdown(b.lockdown)
+    setCode5Interval(b.code5Interval)
+    setCode5Input(String(b.code5Interval))
     loadStats()
   }
 
@@ -64,6 +79,9 @@ export default function ControlSystemPage() {
     try {
       await electionControl.setStatus(next)
       setStatus(next)
+      // Play the matching voice code
+      if (next === "active") await broadcastDb.trigger("3")
+      else if (next === "stopped" || next === "completed") await broadcastDb.trigger("9")
       if (typeof window !== "undefined") window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
     } catch (error) {
       console.error("Failed to change status:", error)
@@ -71,6 +89,26 @@ export default function ControlSystemPage() {
       setLoading(false)
     }
   }
+
+  const toggleLockdown = async (on: boolean) => {
+    setLoading(true)
+    try {
+      await broadcastDb.setLockdown(on)
+      setLockdown(on)
+    } catch (error) {
+      console.error("Failed to toggle lockdown:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const saveCode5Interval = async () => {
+    const mins = Math.max(0, parseInt(code5Input) || 0)
+    await broadcastDb.setCode5Interval(mins)
+    setCode5Interval(mins)
+  }
+
+  const testCode5 = () => broadcastDb.trigger("5")
 
   const handleReset = async () => {
     setLoading(true)
@@ -212,6 +250,65 @@ export default function ControlSystemPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Emergency / voice-code broadcast */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Megaphone className="h-5 w-5" />Voice Codes &amp; Emergency Broadcast</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Start plays <strong>Code 3</strong> (election begun); Stop / Complete play <strong>Code 9</strong> (voting closed).
+            These announce aloud and show a banner on every screen — login, ballot, live results and reveal.
+          </p>
+
+          {/* Code 5 scheduler */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="mb-3 flex items-center gap-2 font-semibold text-blue-900">
+              <Timer className="h-4 w-4" /> Code 5 — Voting Instructions
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <Label htmlFor="c5" className="text-xs">Repeat every (minutes, 0 = off)</Label>
+                <Input id="c5" type="number" min={0} value={code5Input} onChange={(e) => setCode5Input(e.target.value)} />
+              </div>
+              <Button onClick={saveCode5Interval} variant="outline">Save schedule</Button>
+              <Button onClick={testCode5} className="bg-blue-600 hover:bg-blue-700">
+                <Volume2 className="mr-2 h-4 w-4" />Test Code 5
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {code5Interval > 0
+                ? `Code 5 repeats every ${code5Interval} minute${code5Interval === 1 ? "" : "s"} while this page stays open.`
+                : "Automatic Code 5 is off."}
+            </p>
+          </div>
+
+          {/* Lockdown */}
+          <div className={`rounded-xl border p-4 ${lockdown ? "border-red-300 bg-red-50" : "border-slate-200"}`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className={`h-6 w-6 ${lockdown ? "text-red-600" : "text-slate-500"}`} />
+                <div>
+                  <p className="font-semibold">{lockdown ? "Lockdown is ACTIVE" : "System Lockdown (Code 7)"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Locks the login, live results and reveal screens with a flashing emergency notice and plays Code 7.
+                  </p>
+                </div>
+              </div>
+              {lockdown ? (
+                <Button onClick={() => toggleLockdown(false)} disabled={loading} variant="outline" className="border-green-300 text-green-700 hover:bg-green-50">
+                  <Lock className="mr-2 h-4 w-4" />Lift Lockdown
+                </Button>
+              ) : (
+                <Button onClick={() => toggleLockdown(true)} disabled={loading} className="bg-red-600 hover:bg-red-700">
+                  <ShieldAlert className="mr-2 h-4 w-4" />Initiate Lockdown
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Danger zone */}
       <Card className="border-red-200">
