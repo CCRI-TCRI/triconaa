@@ -26,45 +26,96 @@ export function EmergencyProvider({ children }: { children: React.ReactNode }) {
   const initialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chimeRef = useRef<HTMLAudioElement | null>(null)
-  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const busyRef = useRef<AnnounceCode | null>(null) // a code currently being announced
+  const pendingCode5Ref = useRef(false) // a Code 5 waiting for a higher-priority code to finish
+  const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const playRef = useRef<(code: AnnounceCode) => void>(() => {})
+
+  // Called when an announcement finishes (audio 'ended' or a safety timeout)
+  const finishAnnouncement = useCallback(() => {
+    if (safetyTimer.current) {
+      clearTimeout(safetyTimer.current)
+      safetyTimer.current = null
+    }
+    const wasBusy = busyRef.current
+    busyRef.current = null
+    setBannerCode(null) // banner stays until the code has finished playing
+    // Now that a higher-priority code is done, release any queued Code 5
+    if (pendingCode5Ref.current && wasBusy && wasBusy !== "5") {
+      pendingCode5Ref.current = false
+      setTimeout(() => playRef.current("5"), 400)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof Audio === "undefined") return
     audioRef.current = new Audio()
     chimeRef.current = new Audio("/audio/chime.mp3")
-  }, [])
+    const a = audioRef.current
+    const onEnded = () => finishAnnouncement()
+    a.addEventListener("ended", onEnded)
+    return () => a.removeEventListener("ended", onEnded)
+  }, [finishAnnouncement])
 
-  const play = useCallback((code: AnnounceCode) => {
-    const meta = CODE_META[code]
-    const announce = () => {
-      if (!audioRef.current) return
-      audioRef.current.src = meta.file
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch(() => {})
-    }
-    // Airport "ding-dong" chime before every announcement, then the code
-    const chime = chimeRef.current
-    if (chime) {
-      let done = false
-      const announceOnce = () => {
-        if (done) return
-        done = true
-        chime.removeEventListener("ended", announceOnce)
+  const play = useCallback(
+    (code: AnnounceCode) => {
+      busyRef.current = code
+      setBannerCode(code)
+      if (safetyTimer.current) clearTimeout(safetyTimer.current)
+      // Safety net in case 'ended' never fires (keeps it visible up to 2 min)
+      safetyTimer.current = setTimeout(() => finishAnnouncement(), 120000)
+
+      const meta = CODE_META[code]
+      const announce = () => {
+        if (!audioRef.current) return
+        audioRef.current.src = meta.file
+        audioRef.current.currentTime = 0
+        audioRef.current.play().catch(() => {
+          // Autoplay blocked — don't leave the banner stuck forever
+          if (safetyTimer.current) clearTimeout(safetyTimer.current)
+          safetyTimer.current = setTimeout(() => finishAnnouncement(), 12000)
+        })
+      }
+
+      // Airport "ding-dong" chime before every announcement, then the code
+      const chime = chimeRef.current
+      if (chime) {
+        let done = false
+        const announceOnce = () => {
+          if (done) return
+          done = true
+          chime.removeEventListener("ended", announceOnce)
+          announce()
+        }
+        chime.addEventListener("ended", announceOnce)
+        chime.currentTime = 0
+        chime.play().catch(() => announceOnce())
+        setTimeout(announceOnce, 4000) // fallback if chime 'ended' is missed
+      } else {
         announce()
       }
-      chime.addEventListener("ended", announceOnce)
-      chime.currentTime = 0
-      chime.play().catch(() => announceOnce())
-      // fallback in case the 'ended' event is missed
-      setTimeout(announceOnce, 4000)
-    } else {
-      announce()
-    }
+    },
+    [finishAnnouncement],
+  )
 
-    setBannerCode(code)
-    if (bannerTimer.current) clearTimeout(bannerTimer.current)
-    bannerTimer.current = setTimeout(() => setBannerCode((c) => (c === code ? null : c)), 15000)
-  }, [])
+  useEffect(() => {
+    playRef.current = play
+  }, [play])
+
+  // Decide whether to play now or queue (Code 5 waits for Code 3/7/9)
+  const handleTrigger = useCallback(
+    (code: AnnounceCode) => {
+      if (code === "5") {
+        const busy = busyRef.current
+        if (busy && busy !== "5") {
+          pendingCode5Ref.current = true // wait until the other code finishes
+          return
+        }
+      }
+      play(code)
+    },
+    [play],
+  )
 
   const poll = useCallback(async () => {
     try {
@@ -78,12 +129,12 @@ export function EmergencyProvider({ children }: { children: React.ReactNode }) {
       }
       if (b.announceAt && b.announceAt !== lastSeen.current && b.code) {
         lastSeen.current = b.announceAt
-        play(b.code)
+        handleTrigger(b.code)
       }
     } catch {
       /* ignore poll errors */
     }
-  }, [play])
+  }, [handleTrigger])
 
   useEffect(() => {
     poll()
