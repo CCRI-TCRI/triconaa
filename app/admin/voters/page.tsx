@@ -49,6 +49,7 @@ import {
     FileDown,
     X,
     ScanFace,
+    FlaskConical,
   } from "lucide-react"
 
 interface Voter {
@@ -106,6 +107,8 @@ export default function VotersPage() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const [enrollVoter, setEnrollVoter] = useState<Voter | null>(null)
   const [enrollBusy, setEnrollBusy] = useState(false)
+  const [testCount, setTestCount] = useState("50")
+  const [generatingTest, setGeneratingTest] = useState(false)
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -554,6 +557,49 @@ export default function VotersPage() {
       toast({ title: "Error", description: "Failed to remove face.", variant: "destructive" })
     } finally {
       setEnrollBusy(false)
+    }
+  }
+
+  // ── Test voting codes (named Voter 1, Voter 2, …) ─────────────
+  const generateTestCodes = async () => {
+    const n = Math.min(500, Math.max(1, parseInt(testCount) || 0))
+    setGeneratingTest(true)
+    try {
+      // Replace any existing test voters (student_id TST###)
+      await supabase.from("users").delete().like("student_id", "TST%")
+      const rows = Array.from({ length: n }, (_, i) => {
+        const num = i + 1
+        return {
+          student_id: "TST" + String(num).padStart(3, "0"),
+          full_name: "Voter " + num,
+          class: classes[num % classes.length],
+          voting_code: "VOTE" + String(num).padStart(3, "0"),
+          has_voted: false,
+        }
+      })
+      const { error } = await supabase.from("users").insert(rows)
+      if (error) throw error
+      toast({ title: "Test codes ready", description: `${n} test voting codes created (VOTE001–VOTE${String(n).padStart(3, "0")}).` })
+      fetchVoters()
+    } catch (error) {
+      console.error("Error generating test codes:", error)
+      toast({ title: "Error", description: "Failed to generate test codes.", variant: "destructive" })
+    } finally {
+      setGeneratingTest(false)
+    }
+  }
+
+  const clearTestCodes = async () => {
+    setGeneratingTest(true)
+    try {
+      await supabase.from("users").delete().like("student_id", "TST%")
+      toast({ title: "Test codes cleared", description: "All test voters were removed." })
+      fetchVoters()
+    } catch (error) {
+      console.error("Error clearing test codes:", error)
+      toast({ title: "Error", description: "Failed to clear test codes.", variant: "destructive" })
+    } finally {
+      setGeneratingTest(false)
     }
   }
 
@@ -1021,6 +1067,103 @@ export default function VotersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Test Voting Codes */}
+      {(() => {
+        const testVoters = voters
+          .filter((v) => v.student_id?.startsWith("TST"))
+          .sort((a, b) => (parseInt(a.student_id.slice(3)) || 0) - (parseInt(b.student_id.slice(3)) || 0))
+        const testUsed = testVoters.filter((v) => v.has_voted).length
+        return (
+          <Card className="border-amber-200">
+            <CardHeader>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FlaskConical className="h-5 w-5 text-amber-600" />
+                    Test Voting Codes
+                  </CardTitle>
+                  <CardDescription>
+                    Create and monitor open test codes (named Voter 1, Voter 2, …) for trying out the system.
+                  </CardDescription>
+                </div>
+                <div className="flex items-end gap-2">
+                  <div>
+                    <Label htmlFor="test-count" className="text-xs">How many</Label>
+                    <Input
+                      id="test-count"
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={testCount}
+                      onChange={(e) => setTestCount(e.target.value)}
+                      className="w-24"
+                    />
+                  </div>
+                  <Button onClick={generateTestCodes} disabled={generatingTest} className="bg-amber-500 text-white hover:bg-amber-600">
+                    {generatingTest ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <FlaskConical className="mr-2 h-4 w-4" />}
+                    Generate
+                  </Button>
+                  {testVoters.length > 0 && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" disabled={generatingTest} className="border-red-200 text-red-600 hover:bg-red-50">
+                          <Trash2 className="mr-2 h-4 w-4" />Clear
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Clear all test codes?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This removes every test voter (Voter 1–{testVoters.length}). Real voters are not affected.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={clearTestCodes} className="bg-red-600 hover:bg-red-700">Clear test codes</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {testVoters.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No test codes yet. Choose a number and click Generate to create open codes (VOTE001, VOTE002, …).
+                </p>
+              ) : (
+                <>
+                  <div className="mb-3 flex flex-wrap gap-4 text-sm">
+                    <span className="font-medium">Total: <strong>{testVoters.length}</strong></span>
+                    <span className="text-green-700">Used: <strong>{testUsed}</strong></span>
+                    <span className="text-amber-700">Unused: <strong>{testVoters.length - testUsed}</strong></span>
+                  </div>
+                  <div className="grid max-h-60 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-5">
+                    {testVoters.map((v) => (
+                      <div
+                        key={v.id}
+                        className={`flex items-center justify-between rounded-md border px-2.5 py-1.5 text-sm ${
+                          v.has_voted ? "border-green-200 bg-green-50" : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-xs text-muted-foreground">{v.full_name}</p>
+                          <p className="font-mono font-semibold">{v.voting_code}</p>
+                        </div>
+                        <span className={`ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${v.has_voted ? "bg-green-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+                          {v.has_voted ? "USED" : "OPEN"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* Filters and Search */}
       <Card>
