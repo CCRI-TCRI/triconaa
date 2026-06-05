@@ -12,6 +12,7 @@ import { motion } from "framer-motion"
 import { GraduationCap, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { setAdminAuthed } from "@/components/admin-guard"
 
 export default function HeadteacherLogin() {
   const { schoolName, logoUrl } = useSchoolBranding()
@@ -34,6 +35,7 @@ export default function HeadteacherLogin() {
       // Set session storage to track login
       sessionStorage.setItem("headteacher_auth", "true")
       sessionStorage.setItem("user_role", "headteacher")
+      setAdminAuthed()
       router.push("/admin/headteacher/dashboard")
     } else {
       setError("Invalid credentials. Contact Unjovu For Help")

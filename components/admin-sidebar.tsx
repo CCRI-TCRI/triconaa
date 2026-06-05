@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { clearAdminAuthed } from "@/components/admin-guard"
 import {
   Sidebar,
   SidebarContent,
@@ -153,11 +154,14 @@ export function AdminSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/">
-                <LogOut className="w-4 h-4" />
-                <span>LogOut</span>
-              </Link>
+            <SidebarMenuButton
+              onClick={() => {
+                clearAdminAuthed()
+                window.location.href = "/"
+              }}
+            >
+              <LogOut className="w-4 h-4" />
+              <span>LogOut</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

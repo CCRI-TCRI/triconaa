@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Shield, Lock } from "lucide-react"
 import { motion } from "framer-motion"
+import { setAdminAuthed } from "@/components/admin-guard"
+
 // Admin credentials for accessing the dashboard
 const ADMIN_USERNAME = "admin"
 const ADMIN_PASSWORD = "Lavender"
@@ -28,6 +30,7 @@ export function AdminAccessButton() {
     await new Promise((resolve) => setTimeout(resolve, 800))
 
     if (credentials.username === ADMIN_USERNAME && credentials.password === ADMIN_PASSWORD) {
+      setAdminAuthed()
       window.location.href = "/admin/dashboard"
     } else {
       setError("Invalid credentials. Please try again.")
