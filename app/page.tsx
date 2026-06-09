@@ -22,6 +22,20 @@ import { getSeasonByTheme, getSeasonalContainerClass } from "@/lib/seasons"
 
 type AppState = "auth" | "tutorial" | "voting" | "complete"
 
+const CELEBRATIONS = [
+  "Vote Submitted Successfully!",
+  "Boom! Your vote is in!",
+  "Your voice has been heard!",
+  "Democracy thanks you!",
+  "History made — vote recorded!",
+  "Nailed it! Ballot cast.",
+  "You did your part — legend!",
+  "Every vote counts, and yours just did!",
+  "Power to the people!",
+  "Sealed, stamped, delivered!",
+]
+const PARTY_COLORS = ["#7a1f2b", "#f5c542", "#2563eb", "#ffffff", "#fbbf24", "#e11d48"]
+
 export default function VotingApp() {
   const { schoolName, logoUrl, seasonalTheme, electionStatus } = useSchoolBranding()
   const { lockdown } = useEmergency()
@@ -30,9 +44,46 @@ export default function VotingApp() {
   const [studentName, setStudentName] = useState("")
   const [showTutorial, setShowTutorial] = useState(false)
   const [showHolidayGreeting, setShowHolidayGreeting] = useState(false)
+  const [celebration, setCelebration] = useState<{ headline: string; effect: "confetti" | "fireworks" } | null>(null)
 
   // Season is driven by the admin Settings (falls back to date-based when "auto")
   const season = getSeasonByTheme(seasonalTheme)
+
+  // Random celebration (fireworks or confetti) when a vote is submitted
+  useEffect(() => {
+    if (appState !== "complete") return
+    const headline = CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)]
+    const effect: "confetti" | "fireworks" = Math.random() < 0.5 ? "fireworks" : "confetti"
+    setCelebration({ headline, effect })
+    let cancelled = false
+    ;(async () => {
+      const confetti = (await import("canvas-confetti")).default
+      if (cancelled) return
+      if (effect === "confetti") {
+        confetti({ particleCount: 170, spread: 95, startVelocity: 45, origin: { y: 0.6 }, colors: PARTY_COLORS })
+        confetti({ particleCount: 70, angle: 60, spread: 65, origin: { x: 0 }, colors: PARTY_COLORS })
+        confetti({ particleCount: 70, angle: 120, spread: 65, origin: { x: 1 }, colors: PARTY_COLORS })
+      } else {
+        const end = Date.now() + 3500
+        const burst = () => {
+          if (cancelled) return
+          confetti({
+            particleCount: 45,
+            startVelocity: 32,
+            spread: 360,
+            ticks: 70,
+            origin: { x: Math.random() * 0.6 + 0.2, y: Math.random() * 0.4 + 0.1 },
+            colors: PARTY_COLORS,
+          })
+          if (Date.now() < end) setTimeout(burst, 320)
+        }
+        burst()
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [appState])
 
   useEffect(() => {
     const hasSeenTutorial = localStorage.getItem("voting-tutorial-seen")
@@ -85,6 +136,7 @@ export default function VotingApp() {
     setStudentName("")
     setShowTutorial(false)
     setShowHolidayGreeting(false)
+    setCelebration(null)
   }
 
   // Emergency lockdown overrides everything on the public app
@@ -172,7 +224,7 @@ export default function VotingApp() {
               transition={{ delay: 0.5 }}
               className="text-4xl md:text-6xl font-bold mb-6"
             >
-              Vote Submitted Successfully!
+              {celebration?.headline || "Vote Submitted Successfully!"}
             </motion.h1>
 
             <motion.p

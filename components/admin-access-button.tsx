@@ -55,47 +55,52 @@ export function AdminAccessButton() {
             <Shield className="w-6 h-6 text-white" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="glass-sheen liquid-glass overflow-hidden border-white/40 sm:max-w-md">
+          {/* refraction orbs behind the glass */}
+          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+            <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-blue-400/40 blur-3xl" />
+            <div className="absolute -right-10 bottom-0 h-40 w-40 rounded-full bg-rose-400/40 blur-3xl" />
+          </div>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-center justify-center">
-              <Lock className="w-5 h-5 text-primary" />
-              Admin Access
-            </DialogTitle>
+            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-600 to-blue-600 shadow-lg ring-1 ring-white/40">
+              <Lock className="h-7 w-7 text-white" />
+            </div>
+            <DialogTitle className="text-center text-xl font-bold text-slate-800">Admin Access</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-slate-700">Username</Label>
               <Input
                 id="username"
                 type="text"
                 value={credentials.username}
                 onChange={(e) => setCredentials((prev) => ({ ...prev, username: e.target.value }))}
                 placeholder="Enter admin username"
+                className="border-white/60 bg-white/60 backdrop-blur"
                 required
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-slate-700">Password</Label>
               <Input
                 id="password"
                 type="password"
                 value={credentials.password}
                 onChange={(e) => setCredentials((prev) => ({ ...prev, password: e.target.value }))}
                 placeholder="Enter admin password"
+                className="border-white/60 bg-white/60 backdrop-blur"
                 required
               />
             </div>
-            {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
-            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-              <p>Admin credentials:</p>
-              <p>Username: <strong>admin</strong></p>
-              <p>Password: <strong>Lavender</strong></p>
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            {error && <div className="rounded-lg bg-red-500/15 p-2 text-sm text-red-700">{error}</div>}
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-rose-600 to-blue-600 shadow-lg hover:from-rose-700 hover:to-blue-700"
+              disabled={isLoading}
+            >
               {isLoading ? "Logging in..." : "Access Admin Panel"}
             </Button>
           </form>
-         
         </DialogContent>
       </Dialog>
     </motion.div>

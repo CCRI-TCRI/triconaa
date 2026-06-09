@@ -13,8 +13,14 @@ export default function AdminLayout({
       <SidebarProvider>
         <AdminSidebar />
         <SidebarInset>
-          <main className="flex-1 min-h-screen bg-gradient-to-br from-rose-100 via-amber-50 to-rose-50 p-6">
-            {children}
+          <main className="admin-aura relative min-h-screen flex-1 p-6">
+            {/* light-refraction orbs */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute -left-24 top-8 h-72 w-72 rounded-full bg-indigo-300/40 blur-3xl" />
+              <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-cyan-300/40 blur-3xl" />
+              <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-fuchsia-300/30 blur-3xl" />
+            </div>
+            <div className="relative z-10">{children}</div>
           </main>
         </SidebarInset>
       </SidebarProvider>

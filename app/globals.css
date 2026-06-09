@@ -146,3 +146,91 @@ body {
 .animate-ticker:hover {
   animation-play-state: paused;
 }
+
+/* ── Liquid glass / light refraction utilities ───────────────── */
+@keyframes aura-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Animated, colourful aurora backdrop for the admin area */
+.admin-aura {
+  background-image: linear-gradient(125deg, #eef2ff, #cffafe, #f5e8ff, #ffe4e6, #e0f2fe, #eef2ff);
+  background-size: 320% 320%;
+  animation: aura-shift 24s ease infinite;
+}
+
+/* Frosted translucent glass panel */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(255, 255, 255, 0.2),
+    0 12px 40px rgba(31, 38, 135, 0.18);
+}
+
+.liquid-glass-dark {
+  background: rgba(20, 16, 30, 0.45);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Diagonal light-refraction sheen across a glass surface */
+.glass-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.glass-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 42%);
+  pointer-events: none;
+}
+.glass-sheen::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -30%;
+  width: 50%;
+  height: 220%;
+  background: linear-gradient(75deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: rotate(8deg);
+  animation: glass-glint 7s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes glass-glint {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0) rotate(8deg);
+    opacity: 0;
+  }
+  75% {
+    opacity: 0.6;
+  }
+  90% {
+    transform: translateX(260%) rotate(8deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-aura {
+    animation: none;
+  }
+  .glass-sheen::after {
+    animation: none;
+  }
+}
