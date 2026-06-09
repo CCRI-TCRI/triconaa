@@ -55,19 +55,19 @@ export function AdminAccessButton() {
             <Shield className="w-6 h-6 text-white" />
           </Button>
         </DialogTrigger>
-        <DialogContent className="glass-sheen liquid-glass overflow-hidden border-white/40 sm:max-w-md">
+        <DialogContent className="liquid-glass overflow-hidden border-white/40 sm:max-w-md">
           {/* refraction orbs behind the glass */}
-          <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
             <div className="absolute -left-10 -top-10 h-40 w-40 rounded-full bg-blue-400/40 blur-3xl" />
             <div className="absolute -right-10 bottom-0 h-40 w-40 rounded-full bg-rose-400/40 blur-3xl" />
           </div>
-          <DialogHeader>
+          <DialogHeader className="relative z-10">
             <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-600 to-blue-600 shadow-lg ring-1 ring-white/40">
               <Lock className="h-7 w-7 text-white" />
             </div>
             <DialogTitle className="text-center text-xl font-bold text-slate-800">Admin Access</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="relative z-10 space-y-4">
             <div>
               <Label htmlFor="username" className="text-slate-700">Username</Label>
               <Input
