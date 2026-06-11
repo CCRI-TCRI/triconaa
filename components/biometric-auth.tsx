@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { motion, AnimatePresence } from "framer-motion"
 import { Camera, User, Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, Vote, CheckCircle2, Star, Trophy, Crown, Megaphone, type LucideIcon } from "lucide-react"
 import { userDb } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { FaceCamera } from "@/components/face-camera"
 import { decodeDescriptor, findBestMatch } from "@/lib/face-recognition"
@@ -70,6 +71,33 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [bgImages, setBgImages] = useState<string[]>([])
+  const [bgVideo, setBgVideo] = useState("")
+  const [slide, setSlide] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      const { data } = await supabase.from("election_settings").select("login_bg_images, login_bg_video").limit(1).single()
+      if (!active || !data) return
+      setBgVideo(data.login_bg_video?.trim() || "")
+      try {
+        const arr = JSON.parse(data.login_bg_images || "[]")
+        if (Array.isArray(arr)) setBgImages(arr)
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (bgVideo || bgImages.length <= 1) return
+    const t = setInterval(() => setSlide((s) => (s + 1) % bgImages.length), 5000)
+    return () => clearInterval(t)
+  }, [bgVideo, bgImages.length])
 
   const handleManualAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -154,14 +182,37 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
 
   return (
     <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#2b303b] px-4 py-8">
+      {/* optional custom background (video or photo slideshow) */}
+      {(bgVideo || bgImages.length > 0) && (
+        <div className="absolute inset-0 z-0">
+          {bgVideo ? (
+            <video src={bgVideo} autoPlay muted loop playsInline className="h-full w-full object-cover" />
+          ) : (
+            <AnimatePresence>
+              <motion.img
+                key={slide}
+                src={bgImages[slide]}
+                alt=""
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.2 }}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            </AnimatePresence>
+          )}
+          <div className="absolute inset-0 bg-black/55" />
+        </div>
+      )}
+
       {/* heading */}
-      <div className="mb-6 text-center">
+      <div className="relative z-10 mb-6 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{schoolName}</h1>
         <p className="mt-1 text-slate-300">Decision {year} · Student Elections</p>
       </div>
 
       {/* split card */}
-      <div className="grid w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl md:grid-cols-2">
+      <div className="relative z-10 grid w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl md:grid-cols-2">
         {/* left greeting panel */}
         <div className="hidden flex-col justify-end bg-[#1b1f29] p-8 text-white md:flex">
           <div className="mb-5 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">

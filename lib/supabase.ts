@@ -66,6 +66,8 @@ export interface ElectionSettings {
   school_name?: string
   school_motto?: string
   logo_url?: string | null
+  login_bg_images?: string | null
+  login_bg_video?: string | null
   start_date: string
   end_date: string
   is_active: boolean

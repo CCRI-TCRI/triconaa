@@ -122,7 +122,7 @@ export default function SettingsPage() {
   }
 
   // Resize an uploaded image to a small square-ish PNG data URL (kept in the DB)
-  const resizeImage = (file: File, max = 256): Promise<string> =>
+  const resizeImage = (file: File, max = 256, mime: string = "image/png", quality = 0.92): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => {
@@ -142,7 +142,7 @@ export default function SettingsPage() {
           const ctx = canvas.getContext("2d")
           if (!ctx) return reject(new Error("no canvas context"))
           ctx.drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL("image/png"))
+          resolve(canvas.toDataURL(mime, quality))
         }
         img.onerror = reject
         img.src = reader.result as string
@@ -170,6 +170,41 @@ export default function SettingsPage() {
   }
 
   const removeLogo = () => updateSetting("logo_url", null)
+
+  // ── Voter login background (slideshow images + optional video) ──
+  const loginImages: string[] = (() => {
+    try {
+      const arr = JSON.parse(settings.login_bg_images || "[]")
+      return Array.isArray(arr) ? arr : []
+    } catch {
+      return []
+    }
+  })()
+
+  const setLoginImages = (arr: string[]) => updateSetting("login_bg_images", JSON.stringify(arr))
+
+  const handleLoginImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image file.", variant: "destructive" })
+      return
+    }
+    if (loginImages.length >= 4) {
+      toast({ title: "Limit reached", description: "You can add up to 4 photos.", variant: "destructive" })
+      return
+    }
+    try {
+      const dataUrl = await resizeImage(file, 1600, "image/jpeg", 0.72)
+      setLoginImages([...loginImages, dataUrl])
+    } catch {
+      toast({ title: "Error", description: "Could not process that image.", variant: "destructive" })
+    } finally {
+      e.target.value = ""
+    }
+  }
+
+  const removeLoginImage = (i: number) => setLoginImages(loginImages.filter((_, idx) => idx !== i))
 
   if (loading) {
     return (
@@ -312,6 +347,64 @@ export default function SettingsPage() {
                 </div>
                 <p className="mt-2 text-xs text-amber-700">
                   Remember to click <strong>Save Settings</strong> (top right) to apply changes site-wide.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-rose-700" />
+                Voter Login Background
+              </CardTitle>
+              <CardDescription>
+                Customise the background of the voter login page with up to 4 photos (a slideshow) or a background video.
+                A video, if set, takes priority over the photos. Leave both empty for the plain dark background.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Slideshow photos */}
+              <div>
+                <Label>Slideshow Photos ({loginImages.length}/4)</Label>
+                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {loginImages.map((src, i) => (
+                    <div key={i} className="group relative aspect-video overflow-hidden rounded-lg border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt={`Login background ${i + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        onClick={() => removeLoginImage(i)}
+                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                        aria-label="Remove"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {loginImages.length < 4 && (
+                    <label className="flex aspect-video cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-rose-200 bg-rose-50/50 text-rose-700 transition hover:border-rose-400 hover:bg-rose-50">
+                      <Upload className="h-5 w-5" />
+                      <span className="text-xs font-medium">Add photo</span>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleLoginImageUpload} />
+                    </label>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Photos are resized automatically and crossfade every few seconds on the login page.
+                </p>
+              </div>
+
+              {/* Background video */}
+              <div>
+                <Label htmlFor="login_video">Background Video URL (optional)</Label>
+                <Input
+                  id="login_video"
+                  value={settings.login_bg_video || ""}
+                  onChange={(e) => updateSetting("login_bg_video", e.target.value)}
+                  placeholder="https://…/background.mp4"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Paste a direct link to an .mp4/.webm video. It plays muted and looped behind the login. Clear it to use the photo slideshow instead.
                 </p>
               </div>
             </CardContent>
