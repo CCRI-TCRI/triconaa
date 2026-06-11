@@ -172,10 +172,13 @@ export default function CandidatesPage() {
                 <div><Label>Full Name *</Label><Input value={newCandidate.full_name} onChange={(e) => setNewCandidate((p) => ({ ...p, full_name: e.target.value }))} /></div>
                 <div>
                   <Label>Class *</Label>
-                  <Select value={newCandidate.class} onValueChange={(v) => setNewCandidate((p) => ({ ...p, class: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                    <SelectContent>{classes.map((cls) => <SelectItem key={cls} value={cls}>{cls}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Input
+                    list="class-options-add"
+                    value={newCandidate.class}
+                    onChange={(e) => setNewCandidate((p) => ({ ...p, class: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. S1A — or type a new class"
+                  />
+                  <datalist id="class-options-add">{classes.map((cls) => <option key={cls} value={cls} />)}</datalist>
                 </div>
                 <div>
                   <Label>Position *</Label>
@@ -318,10 +321,13 @@ export default function CandidatesPage() {
               <div><Label>Full Name</Label><Input value={editingCandidate.full_name} onChange={(e) => setEditingCandidate({ ...editingCandidate, full_name: e.target.value })} /></div>
               <div>
                 <Label>Class</Label>
-                <Select value={editingCandidate.class} onValueChange={(v) => setEditingCandidate({ ...editingCandidate, class: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{classes.map((cls) => <SelectItem key={cls} value={cls}>{cls}</SelectItem>)}</SelectContent>
-                </Select>
+                <Input
+                  list="class-options-edit"
+                  value={editingCandidate.class}
+                  onChange={(e) => setEditingCandidate({ ...editingCandidate, class: e.target.value.toUpperCase() })}
+                  placeholder="e.g. S1A — or type a new class"
+                />
+                <datalist id="class-options-edit">{classes.map((cls) => <option key={cls} value={cls} />)}</datalist>
               </div>
               <div>
                 <Label>Position</Label>
