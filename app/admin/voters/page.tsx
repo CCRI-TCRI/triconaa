@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -109,6 +110,7 @@ export default function VotersPage() {
   const [enrollBusy, setEnrollBusy] = useState(false)
   const [testCount, setTestCount] = useState("50")
   const [generatingTest, setGeneratingTest] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -792,6 +794,58 @@ export default function VotersPage() {
     return matchesSearch && matchesClass && matchesStatus
   })
 
+  // ── Selection + bulk delete ───────────────────────────────────
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const allFilteredSelected = filteredVoters.length > 0 && filteredVoters.every((v) => selected.has(v.id))
+
+  const toggleSelectAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allFilteredSelected) filteredVoters.forEach((v) => next.delete(v.id))
+      else filteredVoters.forEach((v) => next.add(v.id))
+      return next
+    })
+
+  const deleteSelected = async () => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("users").delete().in("id", ids)
+      if (error) throw error
+      setVoters((prev) => prev.filter((v) => !selected.has(v.id)))
+      setSelected(new Set())
+      toast({ title: "Deleted", description: `${ids.length} voter${ids.length === 1 ? "" : "s"} removed.` })
+    } catch (error) {
+      console.error("Error deleting selected:", error)
+      toast({ title: "Error", description: "Failed to delete selected voters.", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const clearAllVoters = async () => {
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("users").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      if (error) throw error
+      setVoters([])
+      setSelected(new Set())
+      toast({ title: "All voters cleared", description: "Every voter has been removed." })
+    } catch (error) {
+      console.error("Error clearing voters:", error)
+      toast({ title: "Error", description: "Failed to clear voters.", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1221,18 +1275,58 @@ export default function VotersPage() {
       {/* Voters Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>Registered Voters</CardTitle>
               <CardDescription>
-                {filteredVoters.length} of {voters.length} voters
+                {selected.size > 0 ? `${selected.size} selected` : `${filteredVoters.length} of ${voters.length} voters`}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {selected.size > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={saving}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete selected ({selected.size})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selected.size} selected voter{selected.size === 1 ? "" : "s"}?</AlertDialogTitle>
+                      <AlertDialogDescription>This permanently removes them and their votes. This cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteSelected} className="bg-red-600 hover:bg-red-700">Delete selected</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
               <Button onClick={generateBulkCodes} variant="outline" size="sm" disabled={saving}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Regenerate All Codes
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={saving || voters.length === 0} className="border-red-200 text-red-600 hover:bg-red-50">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear All Voters
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete all {voters.length} voters?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This removes every voter (including test codes) and all their votes. This cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearAllVoters} className="bg-red-600 hover:bg-red-700">Delete everything</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <Dialog open={showCodesDialog} onOpenChange={setShowCodesDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">
@@ -1269,6 +1363,9 @@ export default function VotersPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} aria-label="Select all" />
+                </TableHead>
                 <TableHead>Student ID</TableHead>
                 <TableHead>Full Name</TableHead>
                 <TableHead>Class</TableHead>
@@ -1280,7 +1377,10 @@ export default function VotersPage() {
             </TableHeader>
             <TableBody>
               {filteredVoters.map((voter) => (
-                <TableRow key={voter.id}>
+                <TableRow key={voter.id} data-state={selected.has(voter.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox checked={selected.has(voter.id)} onCheckedChange={() => toggleSelect(voter.id)} aria-label={`Select ${voter.full_name}`} />
+                  </TableCell>
                   <TableCell className="font-medium">{voter.student_id}</TableCell>
                   <TableCell>{voter.full_name}</TableCell>
                   <TableCell>{voter.class}</TableCell>
