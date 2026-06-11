@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { positionDb, candidateDb, voteDb, userDb, getPositionsWithCandidates } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { FileText, Users, Vote, UserSquare, FileDown, Eye, Loader2, X, CalendarRange } from "lucide-react"
+import { extractLogoColor } from "@/lib/pdf-logo-color"
 
 interface ReportSpec {
   title: string
@@ -205,13 +206,13 @@ export default function ReportsPage() {
     const pageW = doc.internal.pageSize.getWidth()
     const pageH = doc.internal.pageSize.getHeight()
     const M = 48
-    const maroon: [number, number, number] = [122, 31, 43]
     const ink: [number, number, number] = [33, 37, 41]
     const muted: [number, number, number] = [120, 120, 120]
-    const line: [number, number, number] = [210, 200, 202]
+    const line: [number, number, number] = [210, 210, 215]
     const headerBottom = 96
     const generatedAt = new Date().toLocaleString()
     const logo = await loadLogo()
+    const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
 
     const drawHeader = () => {
       if (logo) {

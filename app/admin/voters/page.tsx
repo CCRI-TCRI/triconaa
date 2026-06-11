@@ -29,6 +29,7 @@ import { useSchoolBranding } from "@/components/school-branding-provider"
 import { FaceCamera } from "@/components/face-camera"
 import { encodeDescriptor } from "@/lib/face-recognition"
 import * as XLSX from "xlsx"
+import { extractLogoColor } from "@/lib/pdf-logo-color"
 import {
     Users,
     UserPlus,
@@ -674,11 +675,10 @@ export default function VotersPage() {
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
 
-      const maroon: [number, number, number] = [122, 31, 43]
+      const logo = await loadLogo()
+      const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
       const gold: [number, number, number] = [245, 200, 66]
       const headerH = 92
-
-      const logo = await loadLogo()
       const generatedAt = new Date().toLocaleString()
       const list = filteredVoters
 

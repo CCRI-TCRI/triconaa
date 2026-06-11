@@ -119,7 +119,7 @@ export function AdminSidebar() {
     <Sidebar className="[&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-slate-200 [&_[data-sidebar=sidebar]]:bg-white [&_[data-sidebar=sidebar]]:text-slate-600">
       <SidebarHeader className="border-b border-slate-200">
         <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-indigo-50 ring-1 ring-indigo-100">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-50 ring-1 ring-sky-100">
             <img src={logoUrl} alt={schoolName} className="h-7 w-7 object-contain" />
           </div>
           <div className="min-w-0">
@@ -142,7 +142,7 @@ export function AdminSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={pathname === item.url}
-                      className="rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 data-[active=true]:bg-indigo-50 data-[active=true]:font-medium data-[active=true]:text-indigo-700"
+                      className="rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 data-[active=true]:bg-sky-50 data-[active=true]:font-medium data-[active=true]:text-sky-700"
                     >
                       <Link href={item.url}>
                         <item.icon className="h-4 w-4" />

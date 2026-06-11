@@ -14,9 +14,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/hooks/use-toast"
 import { candidateDb, positionDb } from "@/lib/db"
 import type { Candidate, Position } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { UserPlus, Trash2, Edit, RefreshCw, Search } from "lucide-react"
 
 export default function CandidatesPage() {
@@ -32,6 +34,7 @@ export default function CandidatesPage() {
   const [newCandidate, setNewCandidate] = useState({
     student_id: "", full_name: "", class: "", position_id: "", manifesto: "", photo_url: "",
   })
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -146,6 +149,55 @@ export default function CandidatesPage() {
     return s && p
   })
 
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id))
+
+  const toggleSelectAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allFilteredSelected) filtered.forEach((c) => next.delete(c.id))
+      else filtered.forEach((c) => next.add(c.id))
+      return next
+    })
+
+  const deleteSelected = async () => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("candidates").delete().in("id", ids)
+      if (error) throw error
+      setCandidates((prev) => prev.filter((c) => !ids.includes(c.id)))
+      setSelected(new Set())
+      toast({ title: "Success", description: `Deleted ${ids.length} candidate(s)` })
+    } catch {
+      toast({ title: "Error", description: "Failed to delete selected candidates", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const clearAllCandidates = async () => {
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("candidates").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      if (error) throw error
+      setCandidates([])
+      setSelected(new Set())
+      toast({ title: "Cleared", description: "All candidates deleted" })
+    } catch {
+      toast({ title: "Error", description: "Failed to clear candidates", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getPositionName = (id: string) => positions.find((p) => p.id === id)?.name ?? "Unknown"
 
   if (loading) {
@@ -254,20 +306,68 @@ export default function CandidatesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Candidates</CardTitle>
-          <CardDescription>{filtered.length} of {candidates.length}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Candidates</CardTitle>
+              <CardDescription>{filtered.length} of {candidates.length}</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              {selected.size > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={saving}>
+                      <Trash2 className="w-4 h-4 mr-2" />Delete selected ({selected.size})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selected.size} candidate(s)?</AlertDialogTitle>
+                      <AlertDialogDescription>This will permanently delete the selected candidates and all their votes.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteSelected} className="bg-red-600 hover:bg-red-700">Delete selected</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={saving || candidates.length === 0} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+                    <Trash2 className="w-4 h-4 mr-2" />Clear All Candidates
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear all candidates?</AlertDialogTitle>
+                    <AlertDialogDescription>This will permanently delete ALL {candidates.length} candidates and all associated votes. This cannot be undone.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearAllCandidates} className="bg-red-600 hover:bg-red-700">Delete everything</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} aria-label="Select all" />
+                </TableHead>
                 <TableHead>Student ID</TableHead><TableHead>Full Name</TableHead><TableHead>Class</TableHead>
                 <TableHead>Position</TableHead><TableHead>Votes</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((candidate) => (
-                <TableRow key={candidate.id}>
+                <TableRow key={candidate.id} data-state={selected.has(candidate.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox checked={selected.has(candidate.id)} onCheckedChange={() => toggleSelect(candidate.id)} aria-label={`Select ${candidate.full_name}`} />
+                  </TableCell>
                   <TableCell className="font-medium">{candidate.student_id}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

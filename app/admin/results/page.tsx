@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { Trophy, Users, Vote, Crown, TrendingUp, FileDown, RefreshCw, Award } from "lucide-react"
+import { extractLogoColor } from "@/lib/pdf-logo-color"
 
 interface ResultData {
   position_name: string
@@ -119,14 +120,14 @@ export default function ResultsPage() {
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
       const M = 48 // page margin
-      const maroon: [number, number, number] = [122, 31, 43]
       const ink: [number, number, number] = [33, 37, 41]
       const muted: [number, number, number] = [120, 120, 120]
-      const line: [number, number, number] = [210, 200, 202]
+      const line: [number, number, number] = [210, 210, 215]
       const headerBottom = 96
       const generatedAt = new Date().toLocaleString()
 
       const logo = await loadLogo()
+      const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
       const totalCandidates = results.reduce((s, r) => s + r.candidates.length, 0)
 
       // ── Letterhead (every page) ──────────────────────────────
