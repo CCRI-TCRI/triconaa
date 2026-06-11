@@ -15,9 +15,9 @@ export function AdminAccessButton() {
       <Link
         href="/admin-login"
         aria-label="Admin access"
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-red-600 to-blue-600 shadow-lg transition-all duration-300 hover:from-red-700 hover:to-blue-700 hover:shadow-xl"
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-white shadow-lg transition-colors hover:bg-slate-900"
       >
-        <Shield className="h-6 w-6 text-white" />
+        <Shield className="h-6 w-6" />
       </Link>
     </motion.div>
   )

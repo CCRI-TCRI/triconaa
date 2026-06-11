@@ -153,50 +153,29 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative z-10 overflow-hidden">
-      <FestiveDecor />
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 120, damping: 16 }}
-        className="relative w-full max-w-md"
-      >
-        {/* glow ring */}
-        <div className="absolute -inset-3 rounded-3xl bg-gradient-to-r from-blue-500/30 via-amber-400/25 to-indigo-500/30 blur-2xl" />
-        <Card className="relative overflow-hidden border-0 bg-white/95 shadow-2xl backdrop-blur">
-          <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-amber-400 to-indigo-600" />
-          <CardHeader className="text-center space-y-3 pt-6">
-            <motion.div
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="relative mx-auto h-24 w-24"
-            >
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-100 to-amber-100 shadow-lg" />
-              <motion.div
-                className="absolute -inset-1 rounded-full border-2 border-dashed border-amber-300/60"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img src={logoUrl} alt={schoolName} className="h-20 w-20 object-contain drop-shadow" />
-              </div>
-            </motion.div>
-            <div>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3, type: "spring" }}
-                className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full bg-blue-600/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-700"
-              >
-                <Vote className="h-3.5 w-3.5" />
-                Decision {year}
-              </motion.div>
-              <CardTitle className="text-2xl font-black text-gray-800">{schoolName}</CardTitle>
-              <p className="mt-1 text-gray-600">Student Leadership Elections</p>
-            </div>
-          </CardHeader>
+    <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden bg-[#2b303b] px-4 py-8">
+      {/* heading */}
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{schoolName}</h1>
+        <p className="mt-1 text-slate-300">Decision {year} · Student Elections</p>
+      </div>
 
-          <CardContent className="space-y-6">
+      {/* split card */}
+      <div className="grid w-full max-w-3xl overflow-hidden rounded-2xl shadow-2xl md:grid-cols-2">
+        {/* left greeting panel */}
+        <div className="hidden flex-col justify-end bg-[#1b1f29] p-8 text-white md:flex">
+          <div className="mb-5 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-white">
+            <img src={logoUrl} alt={schoolName} className="h-10 w-10 object-contain" />
+          </div>
+          <h2 className="text-3xl font-bold">Hello~</h2>
+          <p className="mt-3 max-w-[16rem] text-sm leading-relaxed text-slate-400">
+            Welcome to the {schoolName} student elections. Sign in with your voting code to cast your ballot.
+          </p>
+        </div>
+
+        {/* right form panel */}
+        <div className="bg-white p-6 sm:p-8">
+          <div className="space-y-5">
             {/* Authentication Method Toggle */}
             <div className="flex space-x-2 bg-gray-100 rounded-lg p-1">
               <Button
@@ -267,7 +246,7 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
                   <Button
                     type="submit"
                     disabled={isLoading || !tokenCode}
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700"
                   >
                     {isLoading ? (
                       <>
@@ -320,9 +299,9 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
                 Each voting code can only be used once
               </p>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
