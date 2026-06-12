@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Check,
@@ -57,21 +56,21 @@ function BallotShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-100">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-50">
       {/* Header */}
       <header className="flex-none bg-gradient-to-r from-[#1A759F] via-[#168AAD] to-[#1A759F] text-white shadow-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-[#D9ED92]/50">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-2.5 sm:px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-[#D9ED92]/50">
               <img src={logoUrl} alt={schoolName} className="h-8 w-8 object-contain" />
             </div>
-            <div className="leading-tight">
-              <h1 className="text-sm font-semibold sm:text-base">{schoolName}</h1>
-              <p className="text-[11px] text-[#D9ED92]/90">"{motto}" · Official Ballot</p>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-sm font-semibold sm:text-base">{schoolName}</h1>
+              <p className="truncate text-[11px] text-[#D9ED92]/90">"{motto}" · Official Ballot</p>
             </div>
           </div>
           <div
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold tabular-nums ${
+            className={`flex flex-none items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums sm:gap-2 sm:px-3 ${
               timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-[#D9ED92] ring-1 ring-white/15"
             }`}
           >
@@ -84,8 +83,38 @@ function BallotShell({
             )}
           </div>
         </div>
+        <div className="h-1 bg-gradient-to-r from-[#D9ED92] via-[#76C893] to-[#34A0A4]" />
       </header>
       <main className="min-h-0 flex-1">{children}</main>
+    </div>
+  )
+}
+
+// Candidate photo with a graceful initials fallback. Uses a plain <img> (with an
+// onError guard) rather than Radix Avatar — the latter silently falls back to
+// initials if the image hasn't finished loading, which hid real photos.
+function CandidatePhoto({
+  src,
+  name,
+  className = "",
+  textClass = "text-sm",
+}: {
+  src?: string | null
+  name: string
+  className?: string
+  textClass?: string
+}) {
+  const [errored, setErrored] = useState(false)
+  const ini = name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+  const showImg = src && src.trim() !== "" && !errored
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden bg-[#168AAD]/10 ${className}`}>
+      {showImg ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src!} alt={name} onError={() => setErrored(true)} className="h-full w-full object-cover" />
+      ) : (
+        <span className={`font-semibold text-[#168AAD] ${textClass}`}>{ini}</span>
+      )}
     </div>
   )
 }
@@ -210,13 +239,6 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
     return <User className={className} />
   }
 
-  const initials = (name: string) =>
-    name
-      .split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-
   // ── Shared chrome ───────────────────────────────────────────
   if (isLoading) {
     return (
@@ -259,7 +281,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
           >
             <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#168AAD]/10">
@@ -288,12 +310,12 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                       </div>
                     </div>
                     {selectedCandidate && (
-                      <Avatar className="h-9 w-9 ring-1 ring-slate-200">
-                        <AvatarImage src={selectedCandidate.photo_url || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-[#168AAD] text-xs text-white">
-                          {initials(selectedCandidate.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <CandidatePhoto
+                        src={selectedCandidate.photo_url}
+                        name={selectedCandidate.full_name}
+                        className="h-9 w-9 flex-none rounded-full ring-1 ring-slate-200"
+                        textClass="text-xs"
+                      />
                     )}
                   </div>
                 )
@@ -386,23 +408,25 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.25 }}
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
           >
             {/* Title block */}
-            <div className="flex flex-none items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+            <div className="flex flex-none items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-[#168AAD]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#168AAD]">
                   {getCategoryIcon(currentPosition.category, "w-3.5 h-3.5")}
                   {currentPosition.category}
                 </div>
-                <h2 className="truncate text-xl font-bold text-slate-900 sm:text-2xl">{currentPosition.name}</h2>
+                <h2 className="truncate text-lg font-bold text-slate-900 sm:text-2xl">{currentPosition.name}</h2>
               </div>
-              <span className="hidden flex-none text-xs text-slate-400 sm:block">Select one candidate</span>
+              <span className="hidden flex-none rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 sm:block">
+                Select one candidate
+              </span>
             </div>
 
             {/* Candidate options (scrolls) */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-              <div className="grid gap-2.5 sm:grid-cols-2">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60 p-3 sm:p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {currentPosition.candidates.map((candidate) => {
                   const selected = votes[currentPosition.id] === candidate.id
                   return (
@@ -411,35 +435,37 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                       type="button"
                       onClick={() => handleVote(candidate.id)}
                       disabled={isTransitioning}
-                      className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+                      className={`group relative flex items-center gap-3 rounded-2xl border bg-white p-3 text-left shadow-sm transition-all sm:gap-4 sm:p-4 ${
                         selected
-                          ? "border-[#168AAD] bg-[#168AAD]/5 ring-1 ring-[#168AAD]"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                          ? "border-[#168AAD] ring-2 ring-[#168AAD]/30"
+                          : "border-slate-200 hover:-translate-y-0.5 hover:border-[#168AAD]/40 hover:shadow-md"
                       } ${isTransitioning ? "pointer-events-none" : ""}`}
                     >
+                      <CandidatePhoto
+                        src={candidate.photo_url}
+                        name={candidate.full_name}
+                        className={`h-16 w-16 flex-none rounded-xl ring-1 transition ${selected ? "ring-2 ring-[#168AAD]" : "ring-slate-200"}`}
+                        textClass="text-lg"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate font-semibold text-slate-900">{candidate.full_name}</h3>
+                          <span className="flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                            {candidate.class}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-500">
+                          {candidate.manifesto || "No manifesto provided."}
+                        </p>
+                      </div>
+
                       <div
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                          selected ? "border-[#168AAD] bg-[#168AAD]" : "border-slate-300 bg-white"
+                        className={`flex h-5 w-5 flex-none items-center justify-center rounded-full border-2 transition-colors ${
+                          selected ? "border-[#168AAD] bg-[#168AAD]" : "border-slate-300 bg-white group-hover:border-[#168AAD]/50"
                         }`}
                       >
                         {selected && <Check className="h-3.5 w-3.5 text-white" />}
-                      </div>
-
-                      <Avatar className={`h-12 w-12 shrink-0 ${selected ? "ring-2 ring-[#168AAD]" : "ring-1 ring-slate-200"}`}>
-                        <AvatarImage src={candidate.photo_url || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-[#168AAD] text-sm font-semibold text-white">
-                          {initials(candidate.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline gap-2">
-                          <h3 className="truncate font-semibold text-slate-900">{candidate.full_name}</h3>
-                          <span className="shrink-0 text-xs text-slate-400">{candidate.class}</span>
-                        </div>
-                        <p className="line-clamp-2 text-xs leading-snug text-slate-500">
-                          {candidate.manifesto || "No manifesto provided."}
-                        </p>
                       </div>
                     </button>
                   )

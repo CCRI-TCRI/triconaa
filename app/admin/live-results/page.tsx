@@ -118,7 +118,7 @@ export default function LiveResultsPage() {
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-gradient-to-br from-white via-blue-50 to-slate-100 text-slate-900">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-blue-100 bg-white px-8 py-4 shadow-sm">
+      <header className="flex items-center justify-between border-b border-blue-100 bg-white px-4 py-4 shadow-sm sm:px-8">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-white shadow ring-1 ring-blue-100">
             <img src={logoUrl} alt={schoolName} className="h-10 w-10 object-contain" />
@@ -139,7 +139,7 @@ export default function LiveResultsPage() {
       <div className="h-1 bg-gradient-to-r from-blue-700 via-blue-500 to-sky-400" />
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 gap-3 px-8 py-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 px-4 py-4 sm:px-8 sm:grid-cols-4">
         {[
           { label: "Total Votes", value: <AnimatedNumber value={analytics.totalVotes} />, icon: Vote },
           { label: "Turnout", value: <AnimatedNumber value={analytics.turnout} decimals={1} suffix="%" />, icon: TrendingUp },
@@ -159,7 +159,7 @@ export default function LiveResultsPage() {
       </div>
 
       {/* Slideshow of per-position candidate statistics */}
-      <div className="flex min-h-0 flex-1 flex-col px-8 pb-2">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-8">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -252,7 +252,7 @@ export default function LiveResultsPage() {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between border-t border-blue-100 bg-white px-8 py-2.5">
+      <div className="flex items-center justify-between border-t border-blue-100 bg-white px-4 py-2.5 sm:px-8">
         <p className="flex items-center gap-2 text-xs text-slate-500">
           <Activity className="h-4 w-4 text-blue-600" />
           Live candidate statistics · updates every 5 seconds

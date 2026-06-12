@@ -353,7 +353,7 @@ export default function RevealShowPage() {
       <AnimatePresence mode="wait">
         {/* ── LOBBY ── */}
         {phase === "lobby" && (
-          <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative z-10 flex h-full flex-col items-center justify-center px-8">
+          <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative z-10 flex h-full flex-col items-center justify-center px-4 sm:px-8">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-amber-300/40">
                 <img src={logoUrl} alt={schoolName} className="h-14 w-14 object-contain" />
@@ -439,7 +439,7 @@ export default function RevealShowPage() {
 
         {/* ── RACE (racing / drumroll / revealed) ── */}
         {race && (phase === "racing" || phase === "drumroll" || phase === "revealed") && (
-          <motion.div key={`race-${index}-${phase === "revealed" ? "r" : "x"}`} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.4 }} className="relative z-10 flex h-full flex-col px-8 py-6">
+          <motion.div key={`race-${index}-${phase === "revealed" ? "r" : "x"}`} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.4 }} className="relative z-10 flex h-full flex-col px-4 py-6 sm:px-8">
             {/* header */}
             <div className="mb-4 text-center">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-amber-300">{race.category}</p>
@@ -597,7 +597,7 @@ export default function RevealShowPage() {
 
         {/* ── FINALE ── */}
         {phase === "finale" && (
-          <motion.div key="finale" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex h-full flex-col items-center justify-center px-8">
+          <motion.div key="finale" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex h-full flex-col items-center justify-center px-4 sm:px-8">
             <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }} className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-amber-400">
               <Trophy className="h-9 w-9 text-[#3b0a14]" />
             </motion.div>
