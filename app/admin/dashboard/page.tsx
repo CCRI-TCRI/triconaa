@@ -5,18 +5,17 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
-  Users, Vote, Award, BarChart3, RefreshCw, Tv, Power, PauseCircle, StopCircle, Flag,
-  Crown, Clock, ArrowUpRight,
+  Users, Vote, Award, BarChart3, RefreshCw, Tv,
+  Trophy, Clock, ArrowUpRight, Radio,
 } from "lucide-react"
-import { userDb, candidateDb, voteDb, positionDb, electionControl, broadcastDb, type ElectionStatus } from "@/lib/db"
-import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
+import { userDb, candidateDb, voteDb, positionDb, electionControl, type ElectionStatus } from "@/lib/db"
 
 interface PostResult {
   id: string
   name: string
   category: string
   totalVotes: number
-  candidates: { id: string; name: string; votes: number; pct: number; leading: boolean }[]
+  candidates: { id: string; name: string; photo?: string; class?: string; votes: number; pct: number; leading: boolean }[]
 }
 
 const statusBadge: Record<ElectionStatus, string> = {
@@ -61,13 +60,81 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
   )
 }
 
+function CandidateAvatar({ name, photo, leading }: { name: string; photo?: string; leading?: boolean }) {
+  const initials = name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+  return (
+    <div
+      className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold ring-2 ${
+        leading ? "bg-emerald-100 text-emerald-700 ring-emerald-300" : "bg-slate-100 text-slate-500 ring-slate-200"
+      }`}
+    >
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photo} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        initials
+      )}
+    </div>
+  )
+}
+
+function RaceCard({ post }: { post: PostResult }) {
+  return (
+    <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md">
+      {/* card header */}
+      <div className="mb-3 flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-sky-700">{post.name}</p>
+          <p className="text-[11px] uppercase tracking-wide text-slate-400">{post.category}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+          {post.totalVotes} {post.totalVotes === 1 ? "vote" : "votes"}
+        </span>
+      </div>
+
+      {/* candidates */}
+      <div className="space-y-2.5">
+        {post.candidates.map((c) => (
+          <div
+            key={c.id}
+            className={`rounded-lg p-2.5 ${
+              c.leading ? "bg-emerald-50 ring-1 ring-emerald-200" : "bg-slate-50/60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <CandidateAvatar name={c.name} photo={c.photo} leading={c.leading} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  {c.leading && <Trophy className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
+                  <p className="truncate text-sm font-medium text-slate-800">{c.name}</p>
+                </div>
+                <p className="text-xs text-slate-500">
+                  <span className="font-semibold text-slate-700">{c.votes}</span> {c.votes === 1 ? "vote" : "votes"}
+                  <span className="mx-1 text-slate-300">·</span>
+                  {c.pct}%
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${c.leading ? "bg-emerald-500" : "bg-sky-400"}`}
+                style={{ width: `${c.pct}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState({ voters: 0, voted: 0, candidates: 0, votes: 0 })
   const [posts, setPosts] = useState<PostResult[]>([])
   const [activity, setActivity] = useState<{ id: string; voter: string; action: string; time: string }[]>([])
   const [status, setStatus] = useState<ElectionStatus>("active")
   const [loading, setLoading] = useState(true)
-  const [working, setWorking] = useState(false)
+  const [onlyLeaders, setOnlyLeaders] = useState(false)
 
   useEffect(() => {
     load()
@@ -102,7 +169,7 @@ export default function AdminDashboard() {
               candidates: pc
                 .map((c) => {
                   const n = pv.filter((v) => v.candidate_id === c.id).length
-                  return { id: c.id, name: c.full_name, votes: n, pct: pv.length ? Math.round((n / pv.length) * 100) : 0, leading: n > 0 && n === max }
+                  return { id: c.id, name: c.full_name, photo: c.photo_url, class: c.class, votes: n, pct: pv.length ? Math.round((n / pv.length) * 100) : 0, leading: n > 0 && n === max }
                 })
                 .sort((a, b) => b.votes - a.votes),
             }
@@ -128,20 +195,10 @@ export default function AdminDashboard() {
     }
   }
 
-  async function changeStatus(next: ElectionStatus) {
-    setWorking(true)
-    try {
-      await electionControl.setStatus(next)
-      if (next === "active") await broadcastDb.trigger("3")
-      else if (next === "stopped" || next === "completed") await broadcastDb.trigger("9")
-      setStatus(next)
-      window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
-    } finally {
-      setWorking(false)
-    }
-  }
-
   const turnout = stats.voters ? Math.round((stats.voted / stats.voters) * 100) : 0
+  const visiblePosts = onlyLeaders
+    ? posts.map((p) => ({ ...p, candidates: p.candidates.filter((c) => c.leading) }))
+    : posts
 
   if (loading) {
     return (
@@ -179,34 +236,51 @@ export default function AdminDashboard() {
         <StatCard label="Votes Cast" value={stats.votes} sub="total ballots" icon={Vote} tone="rose" />
       </div>
 
-      {/* Controls + turnout */}
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Panel
-            title="Election Controls"
-            action={<span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${statusBadge[status]}`}>{status}</span>}
-          >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Button onClick={() => changeStatus("active")} disabled={working || status === "active"} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                <Power className="h-4 w-4" /> Start
-              </Button>
-              <Button onClick={() => changeStatus("paused")} disabled={working || status !== "active"} variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
-                <PauseCircle className="h-4 w-4" /> Pause
-              </Button>
-              <Button onClick={() => changeStatus("stopped")} disabled={working || status === "stopped"} variant="outline" className="gap-2 border-rose-300 text-rose-700 hover:bg-rose-50">
-                <StopCircle className="h-4 w-4" /> Stop
-              </Button>
-              <Button onClick={() => changeStatus("completed")} disabled={working || status === "completed"} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-                <Flag className="h-4 w-4" /> Complete
-              </Button>
-            </div>
-            <p className="mt-3 text-xs text-slate-400">
-              Start plays Code 3 and opens the ballot. Stop/Complete play Code 9. Completing locks results and switches Live Results to the Reveal Show. More options in{" "}
-              <Link href="/admin/control" className="text-indigo-600 hover:underline">Control System</Link>.
-            </p>
-          </Panel>
+      {/* Live Race Tracker */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" />
+            </span>
+            <h3 className="text-lg font-bold text-slate-800">Live Race Tracker</h3>
+            <span className={`ml-1 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${statusBadge[status]}`}>{status}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={onlyLeaders}
+                onChange={(e) => setOnlyLeaders(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+              />
+              Only leaders
+            </label>
+            <Link href="/admin/results" className="flex items-center gap-1 text-sm font-medium text-sky-600 hover:underline">
+              View all <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
 
+        <div className="p-5">
+          {visiblePosts.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <Radio className="h-8 w-8 text-slate-300" />
+              <p className="text-sm text-slate-400">No results yet. Add candidates and wait for the first votes to come in.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {visiblePosts.map((post) => (
+                <RaceCard key={post.id} post={post} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Participation + activity */}
+      <div className="grid gap-5 lg:grid-cols-3">
         <Panel title="Voter Participation">
           <div className="flex items-end justify-between">
             <span className="text-3xl font-bold text-slate-800">{turnout}%</span>
@@ -215,75 +289,29 @@ export default function AdminDashboard() {
           <Progress value={turnout} className="mt-3 h-2" />
           <p className="mt-2 text-xs text-slate-400">of registered students have voted</p>
         </Panel>
-      </div>
 
-      {/* Results + activity */}
-      <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Panel
-            title="Results by Position"
-            action={
-              <Link href="/admin/results" className="flex items-center gap-1 text-sm text-indigo-600 hover:underline">
-                View all <ArrowUpRight className="h-3.5 w-3.5" />
-              </Link>
-            }
-          >
-            {posts.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-400">No results yet. Add candidates and wait for votes.</p>
+          <Panel title="Recent Activity">
+            {activity.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">No votes yet.</p>
             ) : (
-              <div className="space-y-5">
-                {posts.map((post) => (
-                  <div key={post.id}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-slate-400">{post.category}</p>
-                        <p className="font-semibold text-slate-800">{post.name}</p>
-                      </div>
-                      <span className="text-sm text-slate-500">{post.totalVotes} votes</span>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {activity.map((a) => (
+                  <li key={a.id} className="flex gap-3 rounded-lg border border-slate-100 p-3">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-sky-500" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-700">{a.voter}</p>
+                      <p className="truncate text-xs text-slate-500">{a.action}</p>
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                        <Clock className="h-3 w-3" /> {a.time}
+                      </p>
                     </div>
-                    <div className="space-y-2">
-                      {post.candidates.map((c) => (
-                        <div key={c.id}>
-                          <div className="mb-1 flex items-center justify-between text-sm">
-                            <span className="flex items-center gap-1.5 text-slate-700">
-                              {c.leading && <Crown className="h-3.5 w-3.5 text-amber-500" />}
-                              {c.name}
-                            </span>
-                            <span className="font-medium text-slate-500">{c.votes} · {c.pct}%</span>
-                          </div>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div className={`h-full rounded-full ${c.leading ? "bg-indigo-600" : "bg-slate-300"}`} style={{ width: `${c.pct}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </Panel>
         </div>
-
-        <Panel title="Recent Activity">
-          {activity.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">No votes yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {activity.map((a) => (
-                <li key={a.id} className="flex gap-3">
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-700">{a.voter}</p>
-                    <p className="truncate text-xs text-slate-500">{a.action}</p>
-                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
-                      <Clock className="h-3 w-3" /> {a.time}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
       </div>
     </div>
   )
