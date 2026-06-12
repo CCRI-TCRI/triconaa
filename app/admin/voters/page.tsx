@@ -160,6 +160,7 @@ export default function VotersPage() {
   const [importText, setImportText] = useState("")
   const [importFileName, setImportFileName] = useState("")
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([])
+  const [importClass, setImportClass] = useState("") // when set, all imported rows go to this class
   const [importProgress, setImportProgress] = useState(0)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [enrollVoter, setEnrollVoter] = useState<Voter | null>(null)
@@ -292,6 +293,7 @@ export default function VotersPage() {
     setParsedRows([])
     setImportText("")
     setImportFileName("")
+    setImportClass("")
     setImportProgress(0)
   }
 
@@ -352,7 +354,7 @@ export default function VotersPage() {
         toInsert.push({
           student_id: sid,
           full_name: r.full_name,
-          class: r.class || "N/A",
+          class: importClass || r.class || "N/A",
           voting_code: genCode(),
           has_voted: false,
         })
@@ -1036,6 +1038,29 @@ export default function VotersPage() {
                   Each voter gets a unique voting code.
                 </p>
 
+                {/* Assign all to one class (optional) */}
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Import into a class (optional)</Label>
+                    {importClass && (
+                      <button
+                        onClick={() => setImportClass("")}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" /> Clear
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <ClassPicker value={importClass} onChange={setImportClass} streamOptions={streamOptions} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {importClass
+                      ? `Every imported voter will be placed in ${importClass}, ignoring any class column in the file.`
+                      : "Leave blank to use the Class column from your file (or N/A when missing)."}
+                  </p>
+                </div>
+
                 {/* File upload */}
                 <div>
                   <Label>Upload file (.csv, .xlsx, .xls)</Label>
@@ -1115,7 +1140,13 @@ export default function VotersPage() {
                             <TableRow key={i} className={r.valid ? "" : "opacity-50"}>
                               <TableCell className="py-1.5">{r.full_name || <span className="text-amber-600">— missing —</span>}</TableCell>
                               <TableCell className="py-1.5 text-muted-foreground">{r.student_id || "auto"}</TableCell>
-                              <TableCell className="py-1.5 text-muted-foreground">{r.class || "N/A"}</TableCell>
+                              <TableCell className="py-1.5 text-muted-foreground">
+                                {importClass ? (
+                                  <span className="font-medium text-sky-700">{importClass}</span>
+                                ) : (
+                                  r.class || "N/A"
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
