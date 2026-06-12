@@ -385,10 +385,9 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#5c0f1f] via-[#7a1f2b] to-[#3b0a14] p-6 text-white shadow-2xl">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-amber-400/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl bg-[#168AAD] p-6 text-white shadow-xl">
         <div className="relative flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-amber-300/40">
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-[#D9ED92]/40">
             <img src={logoUrl} alt={schoolName} className="h-11 w-11 object-contain" />
           </div>
           <div>

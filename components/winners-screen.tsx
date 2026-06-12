@@ -49,19 +49,14 @@ export function WinnersScreen() {
   }, [])
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-gradient-to-br from-[#0a1a24] via-[#0d2535] to-[#0a1a24] px-6 py-12 text-white">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-0 h-[32rem] w-[32rem] rounded-full bg-[#168AAD]/30 blur-[140px]" />
-        <div className="absolute -right-40 bottom-0 h-[32rem] w-[32rem] rounded-full bg-[#76C893]/20 blur-[140px]" />
-      </div>
-
+    <div className="relative min-h-[100dvh] overflow-hidden bg-[#0d2535] px-6 py-12 text-white">
       <div className="relative z-10 mx-auto max-w-5xl">
         <div className="mb-10 text-center">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white shadow-2xl ring-2 ring-[#D9ED92]/40">
             <img src={logoUrl} alt={schoolName} className="h-16 w-16 object-contain" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#D9ED92]">{electionTerm}</p>
-          <h1 className="mt-2 bg-gradient-to-r from-[#D9ED92] via-white to-[#D9ED92] bg-clip-text text-4xl font-black text-transparent sm:text-5xl">
+          <h1 className="mt-2 text-4xl font-black text-[#D9ED92] sm:text-5xl">
             Meet Your New Prefects
           </h1>
           <p className="mt-2 text-sm italic text-[#D9ED92]/70">{schoolName} · "{motto}"</p>
