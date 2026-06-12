@@ -11,8 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { motion } from "framer-motion"
 import { GraduationCap, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useSchoolBranding } from "@/components/school-branding-provider"
+import { setAdminAuthed } from "@/components/admin-guard"
 
 export default function HeadteacherLogin() {
+  const { schoolName, logoUrl } = useSchoolBranding()
   const [credentials, setCredentials] = useState({ username: "", password: "" })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -32,6 +35,7 @@ export default function HeadteacherLogin() {
       // Set session storage to track login
       sessionStorage.setItem("headteacher_auth", "true")
       sessionStorage.setItem("user_role", "headteacher")
+      setAdminAuthed()
       router.push("/admin/headteacher/dashboard")
     } else {
       setError("Invalid credentials. Contact Unjovu For Help")
@@ -49,12 +53,12 @@ export default function HeadteacherLogin() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2 }}
-              className="mx-auto w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg"
+              className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border bg-white shadow-lg"
             >
-              <GraduationCap className="w-12 h-12 text-white" />
+              <img src={logoUrl} alt={schoolName} className="h-20 w-20 object-contain" />
             </motion.div>
             <div>
-              <CardTitle className="text-2xl font-bold text-gray-800">Lubiri Secondary School</CardTitle>
+              <CardTitle className="text-2xl font-bold text-gray-800">{schoolName}</CardTitle>
               <p className="text-gray-600 mt-2">Headteacher Access Portal</p>
               <div className="mt-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium inline-block">
                 Election Oversight Dashboard

@@ -137,3 +137,63 @@ export function getSeasonalContainerClass(theme: string): string {
       return "bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900"
   }
 }
+
+// Seasons keyed by theme, used when an admin picks a specific theme in Settings
+const SEASON_PRESETS: Record<string, Season> = {
+  default: {
+    theme: "default",
+    greeting: "Welcome to the voting system!",
+    icon: "🗳️",
+    colors: { primary: "#3B82F6", secondary: "#8B5CF6", accent: "#10B981" },
+    isActive: false,
+  },
+  "fourth-of-july": {
+    theme: "fourth-of-july",
+    greeting: "Happy Independence Day! Celebrate freedom and democracy!",
+    icon: "🇺🇸",
+    colors: { primary: "#B91C1C", secondary: "#1E40AF", accent: "#FFFFFF" },
+    isActive: true,
+  },
+  halloween: {
+    theme: "halloween",
+    greeting: "Happy Halloween! Spooky voting awaits!",
+    icon: "🎃",
+    colors: { primary: "#EA580C", secondary: "#7C2D12", accent: "#A855F7" },
+    isActive: true,
+  },
+  christmas: {
+    theme: "christmas",
+    greeting: "Merry Christmas! Season of giving and voting!",
+    icon: "🎄",
+    colors: { primary: "#DC2626", secondary: "#16A34A", accent: "#FCD34D" },
+    isActive: true,
+  },
+  newyear: {
+    theme: "newyear",
+    greeting: "Happy New Year! New year, new leaders!",
+    icon: "🎊",
+    colors: { primary: "#7C3AED", secondary: "#F59E0B", accent: "#EC4899" },
+    isActive: true,
+  },
+  valentine: {
+    theme: "valentine",
+    greeting: "Happy Valentine's Day! Vote with love!",
+    icon: "💝",
+    colors: { primary: "#EC4899", secondary: "#DC2626", accent: "#FBBF24" },
+    isActive: true,
+  },
+  pride: {
+    theme: "pride",
+    greeting: "Happy Pride Month! Celebrate diversity and inclusion!",
+    icon: "🏳️‍🌈",
+    colors: { primary: "#DC2626", secondary: "#7C3AED", accent: "#F59E0B" },
+    isActive: true,
+  },
+}
+
+// Resolve a Season from a settings value. "auto"/empty falls back to the date-based season.
+export function getSeasonByTheme(theme?: string | null): Season {
+  if (!theme || theme === "auto") return getCurrentSeason()
+  const key = theme === "july4th" ? "fourth-of-july" : theme
+  return SEASON_PRESETS[key] || SEASON_PRESETS.default
+}

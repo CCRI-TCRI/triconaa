@@ -1,10 +1,12 @@
 import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
+import { SchoolBrandingProvider } from "@/components/school-branding-provider"
+import { EmergencyProvider } from "@/components/emergency-broadcast"
 
 export const metadata: Metadata = {
-  title: "Royal Ballot - Lubiri Secondary School",
-  description: "Digital voting platform for Lubiri Secondary School elections of all kinds",
+  title: "Royal Ballot - St. Theresa S.S. Buloba-Kasero",
+  description: "Digital voting platform for St. Theresa S.S. Buloba-Kasero elections of all kinds",
   Developer: "Unjovu",
   
   icons: {
@@ -22,7 +24,11 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
-      <body>{children}</body>
+      <body>
+        <SchoolBrandingProvider>
+          <EmergencyProvider>{children}</EmergencyProvider>
+        </SchoolBrandingProvider>
+      </body>
     </html>
   )
 }

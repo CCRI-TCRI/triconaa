@@ -570,6 +570,42 @@ Open two browser windows and verify updates appear in real-time.
 - [ ] Test real-time updates
 - [ ] Deploy and test production
 
+## Deploying to Vercel
+
+The voting system now reads/writes all data through Supabase (`lib/db.ts`), so a
+Vercel deployment only needs the Supabase environment variables configured.
+
+### 1. Add Environment Variables
+
+In the Vercel dashboard go to **Project → Settings → Environment Variables** and
+add the following for the **Production**, **Preview**, and **Development**
+environments (values come from Supabase → Project Settings → API):
+
+| Variable | Notes |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL (`https://<ref>.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / public JWT key — used by `lib/supabase.ts` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | publishable key (`sb_publishable_...`) — used by `utils/supabase/*` |
+| `SUPABASE_SERVICE_ROLE_KEY` | server-only secret — never expose to the client |
+
+See `.env.example` for the full list. `.env.local` is git-ignored and is only for
+local development.
+
+### 2. Initialise the Database
+
+Run `scripts/schema.sql` once against the Supabase project (Dashboard → SQL
+Editor, or via the Supabase MCP migration). This creates the `users`,
+`positions`, `candidates`, `votes`, and `election_settings` tables, the
+`increment_vote_count` RPC, indexes, RLS policies, and seeds the default
+positions and election settings.
+
+### 3. Deploy
+
+Vercel uses the settings in `vercel.json` (`npm install` / `npm run build`,
+Next.js framework). Push to the connected branch (or run `vercel --prod`) and
+Vercel will build and deploy. After the first deploy, redeploy if you change any
+environment variables so the new values are picked up.
+
 ## Support
 
 For issues:

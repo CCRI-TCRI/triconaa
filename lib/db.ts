@@ -39,6 +39,23 @@ export const userDb = {
     if (error) { console.error("userDb.markAsVoted:", error.message); return null }
     return data
   },
+
+  // Reset every voter's has_voted flag (used by the admin "Reset System" action)
+  resetAllVotes: async (): Promise<boolean> => {
+    const { error } = await supabase
+      .from("users")
+      .update({ has_voted: false, voted_at: null })
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (error) { console.error("userDb.resetAllVotes:", error.message); return false }
+    return true
+  },
+
+  // Store (or clear) a voter's face descriptor for facial recognition login
+  setFaceEncoding: async (id: string, encoding: string | null): Promise<boolean> => {
+    const { error } = await supabase.from("users").update({ face_encoding: encoding }).eq("id", id)
+    if (error) { console.error("userDb.setFaceEncoding:", error.message); return false }
+    return true
+  },
 }
 
 // ── Candidates ────────────────────────────────────────────────
@@ -139,6 +156,29 @@ export const voteDb = {
     }
     return true
   },
+
+  getByPosition: async (positionId: string): Promise<Vote[]> => {
+    const { data, error } = await supabase.from("votes").select("*").eq("position_id", positionId)
+    if (error) { console.error("voteDb.getByPosition:", error.message); return [] }
+    return data ?? []
+  },
+
+  // Delete all cast votes and reset candidate tallies (admin "Reset System" action)
+  deleteAll: async (): Promise<boolean> => {
+    const { error: votesErr } = await supabase
+      .from("votes")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (votesErr) { console.error("voteDb.deleteAll votes:", votesErr.message); return false }
+
+    const { error: candErr } = await supabase
+      .from("candidates")
+      .update({ vote_count: 0 })
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+    if (candErr) { console.error("voteDb.deleteAll candidates:", candErr.message); return false }
+
+    return true
+  },
 }
 
 // ── Positions with candidates (for voting ballot) ─────────────
@@ -155,4 +195,88 @@ export async function getPositionsWithCandidates(): Promise<Array<Position & { c
     ...position,
     candidates: (candidates ?? []).filter((c) => c.position_id === position.id),
   }))
+}
+
+// ── Election control (status + term) ──────────────────────────
+
+export type ElectionStatus = "active" | "paused" | "stopped" | "completed"
+
+export const electionControl = {
+  get: async (): Promise<{ status: ElectionStatus; term: string }> => {
+    const { data } = await supabase
+      .from("election_settings")
+      .select("election_status, election_term")
+      .limit(1)
+      .single()
+    return {
+      status: (data?.election_status as ElectionStatus) || "active",
+      term: data?.election_term || "2027 democratic term",
+    }
+  },
+
+  setStatus: async (status: ElectionStatus): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ election_status: status }).eq("id", row.id)
+    if (error) { console.error("electionControl.setStatus:", error.message); return false }
+    return true
+  },
+}
+
+// ── Emergency / voice-code broadcast ──────────────────────────
+
+export type AnnounceCode = "3" | "5" | "7" | "9"
+
+export interface BroadcastState {
+  code: AnnounceCode | null
+  announceAt: string | null
+  lockdown: boolean
+  code5Interval: number
+}
+
+export const broadcastDb = {
+  get: async (): Promise<BroadcastState> => {
+    const { data } = await supabase
+      .from("election_settings")
+      .select("announce_code, announce_at, lockdown, code5_interval")
+      .limit(1)
+      .single()
+    return {
+      code: (data?.announce_code as AnnounceCode) || null,
+      announceAt: data?.announce_at || null,
+      lockdown: !!data?.lockdown,
+      code5Interval: data?.code5_interval ?? 0,
+    }
+  },
+
+  // Trigger a code: bumps announce_at so listeners play the audio + show the banner
+  trigger: async (code: AnnounceCode): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase
+      .from("election_settings")
+      .update({ announce_code: code, announce_at: new Date().toISOString() })
+      .eq("id", row.id)
+    if (error) { console.error("broadcastDb.trigger:", error.message); return false }
+    return true
+  },
+
+  setLockdown: async (on: boolean): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const update = on
+      ? { lockdown: true, announce_code: "7", announce_at: new Date().toISOString() }
+      : { lockdown: false }
+    const { error } = await supabase.from("election_settings").update(update).eq("id", row.id)
+    if (error) { console.error("broadcastDb.setLockdown:", error.message); return false }
+    return true
+  },
+
+  setCode5Interval: async (minutes: number): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ code5_interval: minutes }).eq("id", row.id)
+    if (error) { console.error("broadcastDb.setCode5Interval:", error.message); return false }
+    return true
+  },
 }

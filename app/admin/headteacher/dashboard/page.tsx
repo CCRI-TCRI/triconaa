@@ -22,6 +22,7 @@ import {
   CheckCircle,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 
 interface DashboardStats {
   totalVoters: number
@@ -45,6 +46,7 @@ interface PostResult {
 }
 
 export default function HeadteacherDashboard() {
+  const { schoolName, logoUrl } = useSchoolBranding()
   const [stats, setStats] = useState<DashboardStats>({
     totalVoters: 0,
     votedCount: 0,
@@ -279,10 +281,10 @@ export default function HeadteacherDashboard() {
         >
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-              <img src="/logo.png" alt="Lubiri Secondary School" className="w-12 h-12 object-contain" />
+              <img src={logoUrl} alt={schoolName} className="w-12 h-12 object-contain" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold tracking-tight text-gray-900">Lubiri Secondary School</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-gray-900">{schoolName}</h2>
               <p className="text-gray-600">Headteacher - Election Oversight Dashboard</p>
             </div>
           </div>

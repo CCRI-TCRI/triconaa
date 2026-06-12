@@ -14,9 +14,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/hooks/use-toast"
 import { candidateDb, positionDb } from "@/lib/db"
 import type { Candidate, Position } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { UserPlus, Trash2, Edit, RefreshCw, Search } from "lucide-react"
 
 export default function CandidatesPage() {
@@ -32,8 +34,47 @@ export default function CandidatesPage() {
   const [newCandidate, setNewCandidate] = useState({
     student_id: "", full_name: "", class: "", position_id: "", manifesto: "", photo_url: "",
   })
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
+
+  // Resize an uploaded photo to a compact square-ish PNG data URL stored in photo_url
+  const resizeImage = (file: File, max = 400): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const img = new window.Image()
+        img.onload = () => {
+          let { width, height } = img
+          if (width > height && width > max) { height = Math.round((height * max) / width); width = max }
+          else if (height > max) { width = Math.round((width * max) / height); height = max }
+          const canvas = document.createElement("canvas")
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext("2d")
+          if (!ctx) return reject(new Error("no ctx"))
+          ctx.drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL("image/jpeg", 0.85))
+        }
+        img.onerror = reject
+        img.src = reader.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const handlePhoto = async (file: File | undefined, apply: (url: string) => void) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image.", variant: "destructive" })
+      return
+    }
+    try {
+      apply(await resizeImage(file))
+    } catch {
+      toast({ title: "Error", description: "Could not process that image.", variant: "destructive" })
+    }
+  }
 
   useEffect(() => { fetchData() }, [])
 
@@ -108,6 +149,55 @@ export default function CandidatesPage() {
     return s && p
   })
 
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((c) => selected.has(c.id))
+
+  const toggleSelectAll = () =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allFilteredSelected) filtered.forEach((c) => next.delete(c.id))
+      else filtered.forEach((c) => next.add(c.id))
+      return next
+    })
+
+  const deleteSelected = async () => {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("candidates").delete().in("id", ids)
+      if (error) throw error
+      setCandidates((prev) => prev.filter((c) => !ids.includes(c.id)))
+      setSelected(new Set())
+      toast({ title: "Success", description: `Deleted ${ids.length} candidate(s)` })
+    } catch {
+      toast({ title: "Error", description: "Failed to delete selected candidates", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const clearAllCandidates = async () => {
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("candidates").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      if (error) throw error
+      setCandidates([])
+      setSelected(new Set())
+      toast({ title: "Cleared", description: "All candidates deleted" })
+    } catch {
+      toast({ title: "Error", description: "Failed to clear candidates", variant: "destructive" })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getPositionName = (id: string) => positions.find((p) => p.id === id)?.name ?? "Unknown"
 
   if (loading) {
@@ -134,10 +224,13 @@ export default function CandidatesPage() {
                 <div><Label>Full Name *</Label><Input value={newCandidate.full_name} onChange={(e) => setNewCandidate((p) => ({ ...p, full_name: e.target.value }))} /></div>
                 <div>
                   <Label>Class *</Label>
-                  <Select value={newCandidate.class} onValueChange={(v) => setNewCandidate((p) => ({ ...p, class: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                    <SelectContent>{classes.map((cls) => <SelectItem key={cls} value={cls}>{cls}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Input
+                    list="class-options-add"
+                    value={newCandidate.class}
+                    onChange={(e) => setNewCandidate((p) => ({ ...p, class: e.target.value.toUpperCase() }))}
+                    placeholder="e.g. S1A — or type a new class"
+                  />
+                  <datalist id="class-options-add">{classes.map((cls) => <option key={cls} value={cls} />)}</datalist>
                 </div>
                 <div>
                   <Label>Position *</Label>
@@ -147,7 +240,26 @@ export default function CandidatesPage() {
                   </Select>
                 </div>
                 <div><Label>Manifesto</Label><Textarea value={newCandidate.manifesto} onChange={(e) => setNewCandidate((p) => ({ ...p, manifesto: e.target.value }))} rows={3} /></div>
-                <div><Label>Photo URL (optional)</Label><Input value={newCandidate.photo_url} onChange={(e) => setNewCandidate((p) => ({ ...p, photo_url: e.target.value }))} /></div>
+                <div>
+                  <Label>Candidate Photo</Label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                      {newCandidate.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={newCandidate.photo_url} alt="preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <UserPlus className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <label className="cursor-pointer">
+                      <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setNewCandidate((p) => ({ ...p, photo_url: url })))} />
+                    </label>
+                    {newCandidate.photo_url && (
+                      <Button variant="ghost" size="sm" onClick={() => setNewCandidate((p) => ({ ...p, photo_url: "" }))}>Remove</Button>
+                    )}
+                  </div>
+                </div>
                 <Button onClick={addCandidate} className="w-full" disabled={saving}>{saving ? "Adding..." : "Add Candidate"}</Button>
               </div>
             </DialogContent>
@@ -194,22 +306,82 @@ export default function CandidatesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Candidates</CardTitle>
-          <CardDescription>{filtered.length} of {candidates.length}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Candidates</CardTitle>
+              <CardDescription>{filtered.length} of {candidates.length}</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              {selected.size > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={saving}>
+                      <Trash2 className="w-4 h-4 mr-2" />Delete selected ({selected.size})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selected.size} candidate(s)?</AlertDialogTitle>
+                      <AlertDialogDescription>This will permanently delete the selected candidates and all their votes.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteSelected} className="bg-red-600 hover:bg-red-700">Delete selected</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={saving || candidates.length === 0} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+                    <Trash2 className="w-4 h-4 mr-2" />Clear All Candidates
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear all candidates?</AlertDialogTitle>
+                    <AlertDialogDescription>This will permanently delete ALL {candidates.length} candidates and all associated votes. This cannot be undone.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearAllCandidates} className="bg-red-600 hover:bg-red-700">Delete everything</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox checked={allFilteredSelected} onCheckedChange={toggleSelectAll} aria-label="Select all" />
+                </TableHead>
                 <TableHead>Student ID</TableHead><TableHead>Full Name</TableHead><TableHead>Class</TableHead>
                 <TableHead>Position</TableHead><TableHead>Votes</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((candidate) => (
-                <TableRow key={candidate.id}>
+                <TableRow key={candidate.id} data-state={selected.has(candidate.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox checked={selected.has(candidate.id)} onCheckedChange={() => toggleSelect(candidate.id)} aria-label={`Select ${candidate.full_name}`} />
+                  </TableCell>
                   <TableCell className="font-medium">{candidate.student_id}</TableCell>
-                  <TableCell>{candidate.full_name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-[10px] font-bold text-muted-foreground ring-1 ring-border">
+                        {candidate.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={candidate.photo_url} alt={candidate.full_name} className="h-full w-full object-cover" />
+                        ) : (
+                          candidate.full_name.split(" ").map((n) => n[0]).slice(0, 2).join("")
+                        )}
+                      </div>
+                      {candidate.full_name}
+                    </div>
+                  </TableCell>
                   <TableCell>{candidate.class}</TableCell>
                   <TableCell><Badge variant="outline">{getPositionName(candidate.position_id)}</Badge></TableCell>
                   <TableCell><Badge>{candidate.vote_count}</Badge></TableCell>
@@ -249,10 +421,13 @@ export default function CandidatesPage() {
               <div><Label>Full Name</Label><Input value={editingCandidate.full_name} onChange={(e) => setEditingCandidate({ ...editingCandidate, full_name: e.target.value })} /></div>
               <div>
                 <Label>Class</Label>
-                <Select value={editingCandidate.class} onValueChange={(v) => setEditingCandidate({ ...editingCandidate, class: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{classes.map((cls) => <SelectItem key={cls} value={cls}>{cls}</SelectItem>)}</SelectContent>
-                </Select>
+                <Input
+                  list="class-options-edit"
+                  value={editingCandidate.class}
+                  onChange={(e) => setEditingCandidate({ ...editingCandidate, class: e.target.value.toUpperCase() })}
+                  placeholder="e.g. S1A — or type a new class"
+                />
+                <datalist id="class-options-edit">{classes.map((cls) => <option key={cls} value={cls} />)}</datalist>
               </div>
               <div>
                 <Label>Position</Label>
@@ -262,6 +437,26 @@ export default function CandidatesPage() {
                 </Select>
               </div>
               <div><Label>Manifesto</Label><Textarea value={editingCandidate.manifesto} onChange={(e) => setEditingCandidate({ ...editingCandidate, manifesto: e.target.value })} rows={3} /></div>
+              <div>
+                <Label>Candidate Photo</Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                    {editingCandidate.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={editingCandidate.photo_url} alt="preview" className="h-full w-full object-cover" />
+                    ) : (
+                      <UserPlus className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <label className="cursor-pointer">
+                    <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setEditingCandidate({ ...editingCandidate, photo_url: url }))} />
+                  </label>
+                  {editingCandidate.photo_url && (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingCandidate({ ...editingCandidate, photo_url: "" })}>Remove</Button>
+                  )}
+                </div>
+              </div>
               <Button onClick={updateCandidate} className="w-full" disabled={saving}>{saving ? "Updating..." : "Update Candidate"}</Button>
             </div>
           )}

@@ -1,345 +1,289 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import {
-  Users, Vote, Trophy, BarChart3, TrendingUp, RefreshCw, Eye, Crown, Star,
-  Activity, Calendar, Settings, UserPlus, Tv, Zap, CheckCircle2, AlertCircle, Clock, Sparkles,
+  Users, Vote, Award, BarChart3, RefreshCw, Tv, Power, PauseCircle, StopCircle, Flag,
+  Crown, Clock, ArrowUpRight,
 } from "lucide-react"
-import { userDb, candidateDb, voteDb, getPositionsWithCandidates } from "@/lib/db"
-
-interface DashboardStats {
-  totalVoters: number
-  votedCount: number
-  totalCandidates: number
-  totalVotes: number
-}
+import { userDb, candidateDb, voteDb, positionDb, electionControl, broadcastDb, type ElectionStatus } from "@/lib/db"
+import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
 
 interface PostResult {
-  postId: string
-  postTitle: string
+  id: string
+  name: string
   category: string
-  candidates: { id: string; name: string; votes: number; percentage: number; isLeading: boolean }[]
   totalVotes: number
+  candidates: { id: string; name: string; votes: number; pct: number; leading: boolean }[]
 }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
+const statusBadge: Record<ElectionStatus, string> = {
+  active: "bg-emerald-100 text-emerald-700",
+  paused: "bg-amber-100 text-amber-700",
+  stopped: "bg-rose-100 text-rose-700",
+  completed: "bg-indigo-100 text-indigo-700",
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-}
-
-const StatCard = ({ title, value, icon: Icon, color, trend, delay = 0 }: any) => (
-  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.5 }} whileHover={{ y: -5 }} className="group">
-    <Card className={`relative overflow-hidden border-0 shadow-lg bg-gradient-to-br ${color} text-white h-full`}>
-      <CardContent className="p-6 relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-white/80 text-sm font-medium mb-2">{title}</p>
-            <motion.p className="text-4xl font-black" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: delay + 0.2, type: "spring", stiffness: 100 }}>
-              {value}
-            </motion.p>
-            {trend && (
-              <motion.div className="flex items-center mt-3 text-sm font-semibold gap-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + 0.4 }}>
-                <TrendingUp className="w-4 h-4" /><span>{trend}</span>
-              </motion.div>
-            )}
-          </div>
-          <motion.div animate={{ rotate: 360, scale: [1, 1.1, 1] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="opacity-20">
-            <Icon className="w-16 h-16" />
-          </motion.div>
+function StatCard({ label, value, sub, icon: Icon, tone }: any) {
+  const tones: Record<string, string> = {
+    indigo: "bg-indigo-50 text-indigo-600",
+    emerald: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+    rose: "bg-rose-50 text-rose-600",
+  }
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-slate-500">{label}</p>
+          <p className="mt-1 text-3xl font-bold text-slate-800">{value}</p>
+          {sub && <p className="mt-1 text-xs text-slate-400">{sub}</p>}
         </div>
-      </CardContent>
-    </Card>
-  </motion.div>
-)
+        <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${tones[tone]}`}>
+          <Icon className="h-6 w-6" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <h3 className="font-semibold text-slate-800">{title}</h3>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  )
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({ totalVoters: 0, votedCount: 0, totalCandidates: 0, totalVotes: 0 })
-  const [postResults, setPostResults] = useState<PostResult[]>([])
+  const [stats, setStats] = useState({ voters: 0, voted: 0, candidates: 0, votes: 0 })
+  const [posts, setPosts] = useState<PostResult[]>([])
+  const [activity, setActivity] = useState<{ id: string; voter: string; action: string; time: string }[]>([])
+  const [status, setStatus] = useState<ElectionStatus>("active")
   const [loading, setLoading] = useState(true)
-  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [working, setWorking] = useState(false)
 
   useEffect(() => {
-    loadData()
-    const interval = setInterval(loadData, 30000)
-    return () => clearInterval(interval)
+    load()
+    const t = setInterval(load, 15000)
+    return () => clearInterval(t)
   }, [])
 
-  const loadData = async () => {
+  async function load() {
     try {
-      await Promise.all([loadStats(), loadPostResults(), loadRecentActivity()])
-    } catch (error) {
-      console.error("Error loading data:", error)
+      const [users, candidates, positions, votes, control] = await Promise.all([
+        userDb.getAll(), candidateDb.getAll(), positionDb.getAll(), voteDb.getAll(), electionControl.get(),
+      ])
+      setStatus(control.status)
+      setStats({
+        voters: users.length,
+        voted: users.filter((u) => u.has_voted).length,
+        candidates: candidates.length,
+        votes: votes.length,
+      })
+
+      setPosts(
+        positions
+          .map((p) => {
+            const pc = candidates.filter((c) => c.position_id === p.id)
+            const pv = votes.filter((v) => v.position_id === p.id)
+            const max = Math.max(0, ...pc.map((c) => pv.filter((v) => v.candidate_id === c.id).length))
+            return {
+              id: p.id,
+              name: p.name,
+              category: p.category,
+              totalVotes: pv.length,
+              candidates: pc
+                .map((c) => {
+                  const n = pv.filter((v) => v.candidate_id === c.id).length
+                  return { id: c.id, name: c.full_name, votes: n, pct: pv.length ? Math.round((n / pv.length) * 100) : 0, leading: n > 0 && n === max }
+                })
+                .sort((a, b) => b.votes - a.votes),
+            }
+          })
+          .filter((p) => p.candidates.length > 0),
+      )
+
+      const candMap = new Map(candidates.map((c) => [c.id, c.full_name]))
+      const posMap = new Map(positions.map((p) => [p.id, p.name]))
+      const userMap = new Map(users.map((u) => [u.id, u.full_name]))
+      setActivity(
+        votes.slice(0, 8).map((v) => ({
+          id: v.id,
+          voter: userMap.get(v.user_id) || "Unknown",
+          action: `${candMap.get(v.candidate_id) || "Unknown"} · ${posMap.get(v.position_id) || "Unknown"}`,
+          time: new Date(v.created_at).toLocaleString(),
+        })),
+      )
+    } catch (e) {
+      console.error(e)
     } finally {
       setLoading(false)
     }
   }
 
-  const loadStats = async () => {
-    const [users, candidates, votes] = await Promise.all([
-      userDb.getAll(),
-      candidateDb.getAll(),
-      voteDb.getAll(),
-    ])
-    setStats({
-      totalVoters: users.length,
-      votedCount: users.filter((u) => u.has_voted).length,
-      totalCandidates: candidates.length,
-      totalVotes: votes.length,
-    })
+  async function changeStatus(next: ElectionStatus) {
+    setWorking(true)
+    try {
+      await electionControl.setStatus(next)
+      if (next === "active") await broadcastDb.trigger("3")
+      else if (next === "stopped" || next === "completed") await broadcastDb.trigger("9")
+      setStatus(next)
+      window.dispatchEvent(new Event(BRANDING_UPDATED_EVENT))
+    } finally {
+      setWorking(false)
+    }
   }
 
-  const loadPostResults = async () => {
-    const positionsWithCandidates = await getPositionsWithCandidates()
-    const results = positionsWithCandidates.map((position) => {
-      const totalVotesForPosition = position.candidates.reduce((sum, c) => sum + c.vote_count, 0)
-      const candidates = position.candidates.map((candidate) => ({
-        id: candidate.id,
-        name: candidate.full_name,
-        votes: candidate.vote_count,
-        percentage: totalVotesForPosition > 0 ? Math.round((candidate.vote_count / totalVotesForPosition) * 100) : 0,
-        isLeading: candidate.vote_count === Math.max(...position.candidates.map((c) => c.vote_count), 0) && candidate.vote_count > 0,
-      }))
-      return {
-        postId: position.id,
-        postTitle: position.name,
-        category: position.category,
-        candidates: candidates.sort((a, b) => b.votes - a.votes),
-        totalVotes: totalVotesForPosition,
-      }
-    })
-    setPostResults(results)
-  }
-
-  const loadRecentActivity = async () => {
-    const [votes, users, candidates, positions] = await Promise.all([
-      voteDb.getAll(),
-      userDb.getAll(),
-      candidateDb.getAll(),
-      (await import("@/lib/db")).positionDb.getAll(),
-    ])
-    const recentVotes = votes.slice(0, 10)
-    const activity = recentVotes.map((vote) => {
-      const user = users.find((u) => u.id === vote.user_id)
-      const candidate = candidates.find((c) => c.id === vote.candidate_id)
-      const position = positions.find((p) => p.id === vote.position_id)
-      return {
-        id: vote.id,
-        voter: user ? user.full_name : "Unknown",
-        action: `voted for ${candidate?.full_name || "Unknown"} (${position?.name || "Unknown"})`,
-        time: new Date(vote.created_at).toLocaleString(),
-      }
-    })
-    setRecentActivity(activity)
-  }
-
-  const getCategoryIcon = (category: string) => {
-    if (category.includes("Senior") || category.includes("Head")) return <Crown className="w-6 h-6" />
-    if (category.includes("Entertainment")) return <Star className="w-6 h-6" />
-    if (category.includes("Sport") || category.includes("Game")) return <Trophy className="w-6 h-6" />
-    return <Vote className="w-6 h-6" />
-  }
-
-  const getCategoryColor = (category: string) => {
-    if (category.includes("Senior") || category.includes("Head")) return "from-purple-500 via-indigo-500 to-blue-500"
-    if (category.includes("Entertainment")) return "from-pink-500 via-rose-500 to-red-500"
-    if (category.includes("Sport") || category.includes("Game")) return "from-green-500 via-emerald-500 to-teal-500"
-    return "from-blue-500 via-purple-500 to-pink-500"
-  }
-
-  const turnoutPercentage = stats.totalVoters > 0 ? Math.round((stats.votedCount / stats.totalVoters) * 100) : 0
+  const turnout = stats.voters ? Math.round((stats.voted / stats.voters) * 100) : 0
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4" />
-          <p className="text-lg font-semibold text-gray-800">Loading dashboard...</p>
-        </motion.div>
+      <div className="flex h-[60vh] items-center justify-center">
+        <RefreshCw className="h-7 w-7 animate-spin text-indigo-500" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-black text-gray-900 mb-2">Election Dashboard</h1>
-            <p className="text-gray-600 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-500" />Real-time monitoring and analytics
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={loadData} variant="outline" className="gap-2 font-semibold hover:bg-blue-50" disabled={loading}>
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />Refresh
-            </Button>
-            <Badge className="px-4 py-2 bg-green-500/10 text-green-700 border border-green-200 font-semibold">
-              <Eye className="w-4 h-4 mr-2" />Live Updates
-            </Badge>
-          </div>
+    <div className="space-y-5">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
+          <p className="text-sm text-slate-500">Overview and election controls</p>
         </div>
-      </motion.div>
-
-      {/* Live Results Button */}
-      <div className="flex justify-center">
-        <Link href="/admin/live-results" target="_blank">
-          <Button size="lg" className="bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-700 hover:to-purple-700 text-white px-6 py-3 font-semibold shadow-xl">
-            <Tv className="w-5 h-5 mr-2" />View Live Results
+        <div className="flex items-center gap-2">
+          <Button onClick={load} variant="outline" size="sm" className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
-        </Link>
+          <Link href="/admin/live-results" target="_blank">
+            <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Tv className="h-4 w-4" /> Live Results
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Voters" value={stats.totalVoters.toLocaleString()} icon={Users} color="from-blue-500 to-cyan-600" trend="Registered students" delay={0} />
-        <StatCard title="Voter Turnout" value={`${turnoutPercentage}%`} icon={TrendingUp} color="from-green-500 to-emerald-600" trend={`${stats.votedCount}/${stats.totalVoters} voted`} delay={0.1} />
-        <StatCard title="Total Candidates" value={stats.totalCandidates} icon={Trophy} color="from-purple-500 to-pink-600" trend="Running for office" delay={0.2} />
-        <StatCard title="Total Votes" value={stats.totalVotes.toLocaleString()} icon={Vote} color="from-orange-500 to-red-600" trend="Votes cast" delay={0.3} />
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Registered Voters" value={stats.voters} sub="eligible students" icon={Users} tone="indigo" />
+        <StatCard label="Turnout" value={`${turnout}%`} sub={`${stats.voted} of ${stats.voters} voted`} icon={BarChart3} tone="emerald" />
+        <StatCard label="Candidates" value={stats.candidates} sub="running for office" icon={Award} tone="amber" />
+        <StatCard label="Votes Cast" value={stats.votes} sub="total ballots" icon={Vote} tone="rose" />
       </div>
 
-      {/* Turnout Progress */}
-      <Card className="border-0 shadow-lg overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <BarChart3 className="w-6 h-6 text-blue-600" />Voter Participation
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-700">Turnout Progress</span>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 font-bold text-base">
-              {stats.votedCount} / {stats.totalVoters}
-            </Badge>
-          </div>
-          <Progress value={turnoutPercentage} className="h-4" />
-          <p className="text-sm text-gray-600 text-center font-medium mt-3">
-            {turnoutPercentage}% of registered students have participated
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Live Election Results */}
+      {/* Controls + turnout */}
+      <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card className="border-0 shadow-lg overflow-hidden h-full">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3">
-                  <CheckCircle2 className="w-6 h-6 text-purple-600" />Live Election Results
-                </CardTitle>
-                <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-semibold">
-                  <Eye className="w-3 h-3 mr-1" />Real-time
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                {postResults.length > 0 ? postResults.map((post, index) => (
-                  <div key={post.postId} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className={`flex items-center gap-3 p-4 bg-gradient-to-r ${getCategoryColor(post.category)} text-white`}>
-                      {getCategoryIcon(post.category)}
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg">{post.postTitle}</h3>
-                        <Badge className="mt-1 bg-white/20 text-white border-white/30">{post.category}</Badge>
+          <Panel
+            title="Election Controls"
+            action={<span className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${statusBadge[status]}`}>{status}</span>}
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Button onClick={() => changeStatus("active")} disabled={working || status === "active"} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                <Power className="h-4 w-4" /> Start
+              </Button>
+              <Button onClick={() => changeStatus("paused")} disabled={working || status !== "active"} variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                <PauseCircle className="h-4 w-4" /> Pause
+              </Button>
+              <Button onClick={() => changeStatus("stopped")} disabled={working || status === "stopped"} variant="outline" className="gap-2 border-rose-300 text-rose-700 hover:bg-rose-50">
+                <StopCircle className="h-4 w-4" /> Stop
+              </Button>
+              <Button onClick={() => changeStatus("completed")} disabled={working || status === "completed"} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                <Flag className="h-4 w-4" /> Complete
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              Start plays Code 3 and opens the ballot. Stop/Complete play Code 9. Completing locks results and switches Live Results to the Reveal Show. More options in{" "}
+              <Link href="/admin/control" className="text-indigo-600 hover:underline">Control System</Link>.
+            </p>
+          </Panel>
+        </div>
+
+        <Panel title="Voter Participation">
+          <div className="flex items-end justify-between">
+            <span className="text-3xl font-bold text-slate-800">{turnout}%</span>
+            <span className="text-sm text-slate-500">{stats.voted}/{stats.voters}</span>
+          </div>
+          <Progress value={turnout} className="mt-3 h-2" />
+          <p className="mt-2 text-xs text-slate-400">of registered students have voted</p>
+        </Panel>
+      </div>
+
+      {/* Results + activity */}
+      <div className="grid gap-5 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Panel
+            title="Results by Position"
+            action={
+              <Link href="/admin/results" className="flex items-center gap-1 text-sm text-indigo-600 hover:underline">
+                View all <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            }
+          >
+            {posts.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">No results yet. Add candidates and wait for votes.</p>
+            ) : (
+              <div className="space-y-5">
+                {posts.map((post) => (
+                  <div key={post.id}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400">{post.category}</p>
+                        <p className="font-semibold text-slate-800">{post.name}</p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-black">{post.totalVotes}</div>
-                        <div className="text-sm opacity-90">votes</div>
-                      </div>
+                      <span className="text-sm text-slate-500">{post.totalVotes} votes</span>
                     </div>
-                    <div className="p-4 space-y-3">
-                      {post.candidates.map((candidate, ci) => (
-                        <div key={candidate.id} className={`flex items-center justify-between p-4 rounded-lg transition-all ${candidate.isLeading ? "bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300" : "bg-gray-50 border border-gray-200"}`}>
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${candidate.isLeading ? "bg-gradient-to-r from-yellow-400 to-orange-500" : ci === 0 ? "bg-blue-500" : "bg-gray-400"}`}>
-                              #{ci + 1}
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-semibold text-gray-900">{candidate.name}</div>
-                              <div className="text-sm text-gray-600">{candidate.votes} votes</div>
-                            </div>
+                    <div className="space-y-2">
+                      {post.candidates.map((c) => (
+                        <div key={c.id}>
+                          <div className="mb-1 flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-1.5 text-slate-700">
+                              {c.leading && <Crown className="h-3.5 w-3.5 text-amber-500" />}
+                              {c.name}
+                            </span>
+                            <span className="font-medium text-slate-500">{c.votes} · {c.pct}%</span>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-black text-gray-900">{candidate.percentage}%</div>
-                            {candidate.isLeading && (
-                              <div className="flex items-center justify-end gap-1 mt-1">
-                                <Trophy className="w-4 h-4 text-yellow-600" />
-                                <span className="text-xs font-bold text-yellow-600">Leading</span>
-                              </div>
-                            )}
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div className={`h-full rounded-full ${c.leading ? "bg-indigo-600" : "bg-slate-300"}`} style={{ width: `${c.pct}%` }} />
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                )) : (
-                  <div className="text-center py-8">
-                    <AlertCircle className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-500 font-medium">No results yet. Waiting for votes...</p>
-                  </div>
-                )}
+                ))}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </Panel>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card className="border-0 shadow-lg overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-3"><Activity className="w-5 h-5 text-blue-600" />Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              {[
-                { href: "/admin/voters", label: "Manage Voters", icon: Users, color: "blue" },
-                { href: "/admin/candidates", label: "Manage Candidates", icon: UserPlus, color: "green" },
-                { href: "/admin/results", label: "View Results", icon: BarChart3, color: "purple" },
-                { href: "/admin/settings", label: "Settings", icon: Settings, color: "orange" },
-              ].map((action) => (
-                <Button key={action.href} asChild className={`w-full justify-start gap-3 bg-${action.color}-50 hover:bg-${action.color}-100 text-${action.color}-700 border border-${action.color}-200`}>
-                  <a href={action.href}><action.icon className="w-4 h-4" />{action.label}</a>
-                </Button>
+        <Panel title="Recent Activity">
+          {activity.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">No votes yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {activity.map((a) => (
+                <li key={a.id} className="flex gap-3">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-700">{a.voter}</p>
+                    <p className="truncate text-xs text-slate-500">{a.action}</p>
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                      <Clock className="h-3 w-3" /> {a.time}
+                    </p>
+                  </div>
+                </li>
               ))}
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity */}
-          <Card className="border-0 shadow-lg overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-              <CardTitle className="flex items-center gap-3"><Clock className="w-5 h-5 text-green-600" />Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {recentActivity.length > 0 ? recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mt-1.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{activity.voter}</p>
-                      <p className="text-xs text-gray-600 truncate">{activity.action}</p>
-                      <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
-                    </div>
-                  </div>
-                )) : (
-                  <p className="text-sm text-gray-500 text-center py-6">No recent activity</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </ul>
+          )}
+        </Panel>
       </div>
     </div>
   )

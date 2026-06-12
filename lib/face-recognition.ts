@@ -1,72 +1,79 @@
 "use client"
 
-export class FaceRecognition {
-  private video: HTMLVideoElement | null = null
-  private canvas: HTMLCanvasElement | null = null
-  private stream: MediaStream | null = null
+// Client-side facial recognition helpers (powered by @vladmandic/face-api).
+// Models are loaded from a CDN at runtime so no large weights are bundled.
 
-  async initializeCamera(videoElement: HTMLVideoElement): Promise<boolean> {
-    try {
-      this.video = videoElement
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: 640,
-          height: 480,
-          facingMode: "user",
-        },
-      })
+const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model"
 
-      this.video.srcObject = this.stream
-      return true
-    } catch (error) {
-      console.error("Camera initialization failed:", error)
-      return false
-    }
+// Two faces are considered the same person when the Euclidean distance
+// between their 128-d descriptors is below this threshold.
+export const FACE_MATCH_THRESHOLD = 0.5
+
+let modelsPromise: Promise<void> | null = null
+
+export async function loadFaceModels(): Promise<void> {
+  if (modelsPromise) return modelsPromise
+  modelsPromise = (async () => {
+    const faceapi = await import("@vladmandic/face-api")
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+    ])
+  })()
+  return modelsPromise
+}
+
+// Detect a single face and return its 128-d descriptor (or null if none found).
+export async function getFaceDescriptor(
+  input: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+): Promise<Float32Array | null> {
+  const faceapi = await import("@vladmandic/face-api")
+  const detection = await faceapi
+    .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 }))
+    .withFaceLandmarks()
+    .withFaceDescriptor()
+  return detection?.descriptor ?? null
+}
+
+export function euclideanDistance(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  let sum = 0
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i]
+    sum += d * d
   }
+  return Math.sqrt(sum)
+}
 
-  async captureFrame(): Promise<string | null> {
-    if (!this.video) return null
+export function encodeDescriptor(descriptor: Float32Array): string {
+  return JSON.stringify(Array.from(descriptor))
+}
 
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
-
-    if (!ctx) return null
-
-    canvas.width = this.video.videoWidth
-    canvas.height = this.video.videoHeight
-
-    ctx.drawImage(this.video, 0, 0)
-
-    return canvas.toDataURL("image/jpeg", 0.8)
-  }
-
-  async detectFace(imageData: string): Promise<boolean> {
-    // Simulate face detection - in production, use a proper face detection library
-    // like face-api.js or integrate with a cloud service
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Mock face detection result
-        resolve(Math.random() > 0.2) // 80% success rate for demo
-      }, 1000)
-    })
-  }
-
-  async compareFaces(image1: string, image2: string): Promise<number> {
-    // Simulate face comparison - returns similarity score 0-1
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Mock comparison result
-        resolve(Math.random() * 0.4 + 0.6) // 60-100% similarity for demo
-      }, 1500)
-    })
-  }
-
-  stopCamera(): void {
-    if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop())
-      this.stream = null
-    }
+export function decodeDescriptor(encoded: string | null | undefined): number[] | null {
+  if (!encoded) return null
+  try {
+    const arr = JSON.parse(encoded)
+    return Array.isArray(arr) && arr.length === 128 ? arr : null
+  } catch {
+    return null
   }
 }
 
-export const faceRecognition = new FaceRecognition()
+export interface FaceProfile {
+  id: string
+  descriptor: number[]
+}
+
+// Find the closest enrolled face within the threshold.
+export function findBestMatch(
+  descriptor: Float32Array,
+  profiles: FaceProfile[],
+): { id: string; distance: number } | null {
+  let best: { id: string; distance: number } | null = null
+  for (const p of profiles) {
+    const distance = euclideanDistance(descriptor, p.descriptor)
+    if (!best || distance < best.distance) best = { id: p.id, distance }
+  }
+  if (best && best.distance <= FACE_MATCH_THRESHOLD) return best
+  return null
+}

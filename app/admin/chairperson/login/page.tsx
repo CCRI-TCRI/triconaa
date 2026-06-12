@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { motion } from "framer-motion"
 import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { setAdminAuthed } from "@/components/admin-guard"
 
 export default function ChairpersonLogin() {
   const [credentials, setCredentials] = useState({ username: "", password: "" })
@@ -32,6 +33,7 @@ export default function ChairpersonLogin() {
       // Set session storage to track login
       sessionStorage.setItem("chairperson_auth", "true")
       sessionStorage.setItem("user_role", "chairperson")
+      setAdminAuthed()
       router.push("/admin/chairperson/dashboard")
     } else {
       setError("Invalid credentials. Use chairperson/chair2024 for demo.")

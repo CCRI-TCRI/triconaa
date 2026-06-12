@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useSchoolBranding } from "@/components/school-branding-provider"
+import { clearAdminAuthed } from "@/components/admin-guard"
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +29,8 @@ import {
   Shield,
   LogOut,
   School,
+  Briefcase,
+  Sparkles,
 } from "lucide-react"
 
 const menuItems = [
@@ -48,6 +52,11 @@ const menuItems = [
   {
     title: "Election Management",
     items: [
+      {
+        title: "Positions",
+        url: "/admin/positions",
+        icon: Briefcase,
+      },
       {
         title: "Voters",
         url: "/admin/voters",
@@ -72,6 +81,11 @@ const menuItems = [
         title: "Live Results",
         url: "/admin/results",
         icon: Trophy,
+      },
+      {
+        title: "Reveal Show",
+        url: "/admin/reveal",
+        icon: Sparkles,
       },
       {
         title: "Analytics",
@@ -99,15 +113,18 @@ const menuItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const { schoolName, logoUrl } = useSchoolBranding()
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-4 py-2">
-          <School className="w-8 h-8 text-primary" />
-          <div>
-            <h2 className="text-lg font-semibold">Lubiri Secondary</h2>
-            <p className="text-sm text-muted-foreground">Admin Panel</p>
+    <Sidebar className="[&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-slate-200 [&_[data-sidebar=sidebar]]:bg-white [&_[data-sidebar=sidebar]]:text-slate-600">
+      <SidebarHeader className="border-b border-slate-200">
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-50 ring-1 ring-sky-100">
+            <img src={logoUrl} alt={schoolName} className="h-7 w-7 object-contain" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-slate-800">{schoolName}</h2>
+            <p className="text-[11px] text-slate-400">Administration</p>
           </div>
         </div>
       </SidebarHeader>
@@ -115,14 +132,20 @@ export function AdminSidebar() {
       <SidebarContent>
         {menuItems.map((group) => (
           <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {group.title}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={pathname === item.url}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.url}
+                      className="rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 data-[active=true]:bg-sky-50 data-[active=true]:font-medium data-[active=true]:text-sky-700"
+                    >
                       <Link href={item.url}>
-                        <item.icon className="w-4 h-4" />
+                        <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -134,14 +157,18 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="border-t border-slate-200">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/">
-                <LogOut className="w-4 h-4" />
-                <span>LogOut</span>
-              </Link>
+            <SidebarMenuButton
+              className="rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+              onClick={() => {
+                clearAdminAuthed()
+                window.location.href = "/"
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Log out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

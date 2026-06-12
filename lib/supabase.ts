@@ -63,6 +63,11 @@ export interface Vote {
 export interface ElectionSettings {
   id?: string
   election_name: string
+  school_name?: string
+  school_motto?: string
+  logo_url?: string | null
+  login_bg_images?: string | null
+  login_bg_video?: string | null
   start_date: string
   end_date: string
   is_active: boolean

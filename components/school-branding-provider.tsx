@@ -1,0 +1,83 @@
+"use client"
+
+import { createContext, useContext, useCallback, useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase"
+
+export interface SchoolBranding {
+  schoolName: string
+  motto: string
+  logoUrl: string
+  seasonalTheme: string
+  electionStatus: "active" | "paused" | "stopped" | "completed"
+  electionTerm: string
+  loading: boolean
+  refresh: () => Promise<void>
+}
+
+// Site-wide defaults (used until the database value loads, or if it is unset)
+export const DEFAULT_BRANDING = {
+  schoolName: "St. Theresa S.S. Buloba-Kasero",
+  motto: "Mercy Upon Us",
+  logoUrl: "/logo.png",
+  seasonalTheme: "auto",
+  electionStatus: "active" as const,
+  electionTerm: "2027 democratic term",
+}
+
+const BrandingContext = createContext<SchoolBranding>({
+  ...DEFAULT_BRANDING,
+  loading: true,
+  refresh: async () => {},
+})
+
+export const BRANDING_UPDATED_EVENT = "school-branding-updated"
+
+export function SchoolBrandingProvider({ children }: { children: React.ReactNode }) {
+  const [schoolName, setSchoolName] = useState(DEFAULT_BRANDING.schoolName)
+  const [motto, setMotto] = useState(DEFAULT_BRANDING.motto)
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_BRANDING.logoUrl)
+  const [seasonalTheme, setSeasonalTheme] = useState(DEFAULT_BRANDING.seasonalTheme)
+  const [electionStatus, setElectionStatus] = useState<SchoolBranding["electionStatus"]>(DEFAULT_BRANDING.electionStatus)
+  const [electionTerm, setElectionTerm] = useState(DEFAULT_BRANDING.electionTerm)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from("election_settings")
+        .select("school_name, school_motto, logo_url, seasonal_theme, election_status, election_term")
+        .limit(1)
+        .single()
+      if (data) {
+        setSchoolName(data.school_name?.trim() || DEFAULT_BRANDING.schoolName)
+        setMotto(data.school_motto?.trim() || DEFAULT_BRANDING.motto)
+        setLogoUrl(data.logo_url?.trim() || DEFAULT_BRANDING.logoUrl)
+        setSeasonalTheme(data.seasonal_theme?.trim() || DEFAULT_BRANDING.seasonalTheme)
+        setElectionStatus((data.election_status as SchoolBranding["electionStatus"]) || DEFAULT_BRANDING.electionStatus)
+        setElectionTerm(data.election_term?.trim() || DEFAULT_BRANDING.electionTerm)
+      }
+    } catch {
+      // keep defaults
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    refresh()
+    // Allow other pages (e.g. settings) to trigger a live refresh after saving
+    const handler = () => refresh()
+    window.addEventListener(BRANDING_UPDATED_EVENT, handler)
+    return () => window.removeEventListener(BRANDING_UPDATED_EVENT, handler)
+  }, [refresh])
+
+  return (
+    <BrandingContext.Provider value={{ schoolName, motto, logoUrl, seasonalTheme, electionStatus, electionTerm, loading, refresh }}>
+      {children}
+    </BrandingContext.Provider>
+  )
+}
+
+export function useSchoolBranding() {
+  return useContext(BrandingContext)
+}
