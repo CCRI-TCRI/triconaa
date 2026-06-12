@@ -9,6 +9,13 @@ import {
   Trophy, Clock, ArrowUpRight, Radio,
 } from "lucide-react"
 import { userDb, candidateDb, voteDb, positionDb, electionControl, type ElectionStatus } from "@/lib/db"
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
+  AreaChart, Area, CartesianGrid,
+} from "recharts"
+
+// Meadow Green palette
+const PALETTE = ["#168AAD", "#34A0A4", "#52B69A", "#76C893", "#99D98C", "#1A759F", "#1E6091", "#184E77", "#B5E48C", "#D9ED92"]
 
 interface PostResult {
   id: string
@@ -16,6 +23,12 @@ interface PostResult {
   category: string
   totalVotes: number
   candidates: { id: string; name: string; photo?: string; class?: string; votes: number; pct: number; leading: boolean }[]
+}
+
+interface ChartData {
+  turnout: { name: string; value: number }[]
+  byPosition: { name: string; votes: number }[]
+  timeline: { label: string; votes: number }[]
 }
 
 const statusBadge: Record<ElectionStatus, string> = {
@@ -31,6 +44,8 @@ function StatCard({ label, value, sub, icon: Icon, tone }: any) {
     emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
     rose: "bg-rose-50 text-rose-600",
+    sky: "bg-sky-50 text-sky-600",
+    teal: "bg-teal-50 text-teal-600",
   }
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -135,6 +150,7 @@ export default function AdminDashboard() {
   const [status, setStatus] = useState<ElectionStatus>("active")
   const [loading, setLoading] = useState(true)
   const [onlyLeaders, setOnlyLeaders] = useState(false)
+  const [charts, setCharts] = useState<ChartData>({ turnout: [], byPosition: [], timeline: [] })
 
   useEffect(() => {
     load()
@@ -148,34 +164,66 @@ export default function AdminDashboard() {
         userDb.getAll(), candidateDb.getAll(), positionDb.getAll(), voteDb.getAll(), electionControl.get(),
       ])
       setStatus(control.status)
+      const votedCount = users.filter((u) => u.has_voted).length
       setStats({
         voters: users.length,
-        voted: users.filter((u) => u.has_voted).length,
+        voted: votedCount,
         candidates: candidates.length,
         votes: votes.length,
       })
 
-      setPosts(
-        positions
-          .map((p) => {
-            const pc = candidates.filter((c) => c.position_id === p.id)
-            const pv = votes.filter((v) => v.position_id === p.id)
-            const max = Math.max(0, ...pc.map((c) => pv.filter((v) => v.candidate_id === c.id).length))
-            return {
-              id: p.id,
-              name: p.name,
-              category: p.category,
-              totalVotes: pv.length,
-              candidates: pc
-                .map((c) => {
-                  const n = pv.filter((v) => v.candidate_id === c.id).length
-                  return { id: c.id, name: c.full_name, photo: c.photo_url, class: c.class, votes: n, pct: pv.length ? Math.round((n / pv.length) * 100) : 0, leading: n > 0 && n === max }
-                })
-                .sort((a, b) => b.votes - a.votes),
-            }
-          })
-          .filter((p) => p.candidates.length > 0),
-      )
+      const postResults = positions
+        .map((p) => {
+          const pc = candidates.filter((c) => c.position_id === p.id)
+          const pv = votes.filter((v) => v.position_id === p.id)
+          const max = Math.max(0, ...pc.map((c) => pv.filter((v) => v.candidate_id === c.id).length))
+          return {
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            totalVotes: pv.length,
+            candidates: pc
+              .map((c) => {
+                const n = pv.filter((v) => v.candidate_id === c.id).length
+                return { id: c.id, name: c.full_name, photo: c.photo_url, class: c.class, votes: n, pct: pv.length ? Math.round((n / pv.length) * 100) : 0, leading: n > 0 && n === max }
+              })
+              .sort((a, b) => b.votes - a.votes),
+          }
+        })
+        .filter((p) => p.candidates.length > 0)
+      setPosts(postResults)
+
+      // ── Chart data ──────────────────────────────────────────
+      const turnout = [
+        { name: "Voted", value: votedCount },
+        { name: "Not yet", value: Math.max(0, users.length - votedCount) },
+      ]
+      const byPosition = postResults
+        .map((p) => ({ name: p.name, votes: p.totalVotes }))
+        .sort((a, b) => b.votes - a.votes)
+        .slice(0, 8)
+
+      // Cumulative votes over time, bucketed into ~10 points
+      const sorted = [...votes].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
+      let timeline: { label: string; votes: number }[] = []
+      if (sorted.length > 0) {
+        const first = +new Date(sorted[0].created_at)
+        const last = +new Date(sorted[sorted.length - 1].created_at)
+        const span = Math.max(1, last - first)
+        const BUCKETS = 10
+        const counts = new Array(BUCKETS).fill(0)
+        sorted.forEach((v) => {
+          const idx = Math.min(BUCKETS - 1, Math.floor(((+new Date(v.created_at) - first) / span) * BUCKETS))
+          counts[idx]++
+        })
+        let cum = 0
+        timeline = counts.map((c, i) => {
+          cum += c
+          const t = new Date(first + (span / BUCKETS) * i)
+          return { label: t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), votes: cum }
+        })
+      }
+      setCharts({ turnout, byPosition, timeline })
 
       const candMap = new Map(candidates.map((c) => [c.id, c.full_name]))
       const posMap = new Map(positions.map((p) => [p.id, p.name]))
@@ -221,7 +269,7 @@ export default function AdminDashboard() {
             <RefreshCw className="h-4 w-4" /> Refresh
           </Button>
           <Link href="/admin/live-results" target="_blank">
-            <Button size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+            <Button size="sm" className="gap-2 bg-sky-600 hover:bg-sky-700">
               <Tv className="h-4 w-4" /> Live Results
             </Button>
           </Link>
@@ -230,11 +278,92 @@ export default function AdminDashboard() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Registered Voters" value={stats.voters} sub="eligible students" icon={Users} tone="indigo" />
+        <StatCard label="Registered Voters" value={stats.voters} sub="eligible students" icon={Users} tone="sky" />
         <StatCard label="Turnout" value={`${turnout}%`} sub={`${stats.voted} of ${stats.voters} voted`} icon={BarChart3} tone="emerald" />
-        <StatCard label="Candidates" value={stats.candidates} sub="running for office" icon={Award} tone="amber" />
-        <StatCard label="Votes Cast" value={stats.votes} sub="total ballots" icon={Vote} tone="rose" />
+        <StatCard label="Candidates" value={stats.candidates} sub="running for office" icon={Award} tone="teal" />
+        <StatCard label="Votes Cast" value={stats.votes} sub="total ballots" icon={Vote} tone="indigo" />
       </div>
+
+      {/* Charts */}
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Turnout donut */}
+        <Panel title="Voter Turnout">
+          <div className="relative">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={charts.turnout.some((d) => d.value > 0) ? charts.turnout : [{ name: "No votes", value: 1 }]}
+                  dataKey="value"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={62}
+                  outerRadius={90}
+                  paddingAngle={2}
+                  stroke="none"
+                >
+                  <Cell fill="#168AAD" />
+                  <Cell fill="#E2E8F0" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-bold text-slate-800">{turnout}%</span>
+              <span className="text-xs text-slate-400">turnout</span>
+            </div>
+          </div>
+          <div className="mt-2 flex justify-center gap-5 text-sm">
+            <span className="flex items-center gap-1.5 text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-[#168AAD]" />Voted {stats.voted}</span>
+            <span className="flex items-center gap-1.5 text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-slate-200" />Pending {Math.max(0, stats.voters - stats.voted)}</span>
+          </div>
+        </Panel>
+
+        {/* Votes by position bar */}
+        <div className="lg:col-span-2">
+          <Panel title="Votes by Position">
+            {charts.byPosition.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-400">No votes recorded yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={charts.byPosition} margin={{ top: 6, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEF2F6" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#94A3B8" }} interval={0} angle={-18} textAnchor="end" height={48} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} allowDecimals={false} />
+                  <Tooltip cursor={{ fill: "#F1F5F9" }} />
+                  <Bar dataKey="votes" radius={[6, 6, 0, 0]} maxBarSize={46}>
+                    {charts.byPosition.map((_, i) => (
+                      <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </Panel>
+        </div>
+      </div>
+
+      {/* Voting activity over time */}
+      <Panel title="Voting Activity Over Time">
+        {charts.timeline.length === 0 ? (
+          <p className="py-16 text-center text-sm text-slate-400">Votes will appear here as students cast their ballots.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={charts.timeline} margin={{ top: 6, right: 12, left: -16, bottom: 0 }}>
+              <defs>
+                <linearGradient id="voteArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34A0A4" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#34A0A4" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEF2F6" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+              <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} allowDecimals={false} />
+              <Tooltip />
+              <Area type="monotone" dataKey="votes" stroke="#168AAD" strokeWidth={2.5} fill="url(#voteArea)" name="Cumulative votes" />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </Panel>
 
       {/* Live Race Tracker */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">

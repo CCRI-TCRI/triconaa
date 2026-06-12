@@ -74,6 +74,58 @@ interface ParsedRow {
   note?: string
 }
 
+// ── Constituencies (year groups) + streams ──────────────────────
+const YEARS = ["S1", "S2", "S3", "S4", "S5", "S6"]
+const DEFAULT_STREAMS = ["A", "B", "C", "D"]
+const ALL_CLASSES = YEARS.flatMap((y) => DEFAULT_STREAMS.map((s) => y + s))
+
+// Extract the year/constituency (S1–S6) from a class string like "S1A"
+function getYear(cls: string): string {
+  const m = (cls || "").toUpperCase().match(/^S\s?([1-6])/)
+  return m ? "S" + m[1] : "Other"
+}
+// Extract the stream (the part after the year), e.g. "S1A" → "A"
+function getStream(cls: string): string {
+  const y = getYear(cls)
+  if (y === "Other") return ""
+  return (cls || "").toUpperCase().replace(/^S\s?[1-6]\s*/, "")
+}
+
+// Combined Year + Stream picker that writes back a single class string
+function ClassPicker({
+  value,
+  onChange,
+  streamOptions,
+}: {
+  value: string
+  onChange: (cls: string) => void
+  streamOptions: string[]
+}) {
+  const year = getYear(value) === "Other" ? "" : getYear(value)
+  const stream = getStream(value)
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Select value={year} onValueChange={(y) => onChange(y + stream)}>
+        <SelectTrigger><SelectValue placeholder="Year (S1–S6)" /></SelectTrigger>
+        <SelectContent>
+          {YEARS.map((y) => (
+            <SelectItem key={y} value={y}>{y}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        list="stream-options"
+        placeholder="Stream (e.g. A)"
+        value={stream}
+        onChange={(e) => onChange(year + e.target.value.toUpperCase())}
+      />
+      <datalist id="stream-options">
+        {streamOptions.map((s) => <option key={s} value={s} />)}
+      </datalist>
+    </div>
+  )
+}
+
 export default function VotersPage() {
   const { schoolName, motto, logoUrl } = useSchoolBranding()
   const [voters, setVoters] = useState<Voter[]>([])
@@ -112,8 +164,13 @@ export default function VotersPage() {
   const [testCount, setTestCount] = useState("50")
   const [generatingTest, setGeneratingTest] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [yearFilter, setYearFilter] = useState("all")
 
-  const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
+  const classes = ALL_CLASSES
+  // Streams that actually appear in the data (plus the defaults), for the picker datalist
+  const streamOptions = Array.from(
+    new Set([...DEFAULT_STREAMS, ...voters.map((v) => getStream(v.class)).filter(Boolean)]),
+  ).sort()
 
   useEffect(() => {
     fetchVoters()
@@ -786,13 +843,23 @@ export default function VotersPage() {
       voter.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       voter.student_id.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesClass = classFilter === "all" || voter.class === classFilter
+    const matchesYear = yearFilter === "all" || getYear(voter.class) === yearFilter
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "voted" && voter.has_voted) ||
       (statusFilter === "pending" && !voter.has_voted)
 
-    return matchesSearch && matchesClass && matchesStatus
+    return matchesSearch && matchesClass && matchesYear && matchesStatus
   })
+
+  // Per-constituency (year group) turnout
+  const constituencies = [...YEARS, "Other"]
+    .map((y) => {
+      const list = voters.filter((v) => getYear(v.class) === y)
+      const voted = list.filter((v) => v.has_voted).length
+      return { year: y, total: list.length, voted, pending: list.length - voted, turnout: list.length ? (voted / list.length) * 100 : 0 }
+    })
+    .filter((c) => c.total > 0)
 
   // ── Selection + bulk delete ───────────────────────────────────
   const toggleSelect = (id: string) =>
@@ -1056,22 +1123,13 @@ export default function VotersPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="class">Class</Label>
-                  <Select
+                  <Label>Class (Year &amp; Stream)</Label>
+                  <ClassPicker
                     value={newVoter.class}
-                    onValueChange={(value) => setNewVoter((prev) => ({ ...prev, class: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {classes.map((cls) => (
-                        <SelectItem key={cls} value={cls}>
-                          {cls}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(cls) => setNewVoter((prev) => ({ ...prev, class: cls }))}
+                    streamOptions={streamOptions}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Pick a constituency (S1–S6), then a stream (e.g. A, B, or a custom one).</p>
                 </div>
                 <Button onClick={addVoter} className="w-full" disabled={saving}>
                   {saving ? "Adding..." : "Add Voter"}
@@ -1121,6 +1179,56 @@ export default function VotersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Constituencies (year groups) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">Voting Constituencies</CardTitle>
+              <CardDescription>Turnout by year group · click a constituency to filter the list below</CardDescription>
+            </div>
+            {yearFilter !== "all" && (
+              <Button variant="outline" size="sm" onClick={() => setYearFilter("all")} className="gap-1">
+                <X className="h-3.5 w-3.5" /> Clear filter ({yearFilter})
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {constituencies.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No voters yet. Add voters with classes like S1A, S2B…</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+              {constituencies.map((c) => {
+                const active = yearFilter === c.year
+                return (
+                  <button
+                    key={c.year}
+                    onClick={() => setYearFilter(active ? "all" : c.year)}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      active ? "border-sky-400 bg-sky-50 ring-1 ring-sky-300" : "border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-800">{c.year}</span>
+                      <span className="text-xs font-semibold text-sky-700">{c.turnout.toFixed(0)}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70">
+                      <div className="h-full rounded-full bg-sky-500 transition-all" style={{ width: `${c.turnout}%` }} />
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      <span className="font-semibold text-emerald-600">{c.voted}</span> voted ·{" "}
+                      <span className="font-semibold text-orange-500">{c.pending}</span> pending
+                    </p>
+                    <p className="text-[11px] text-slate-400">{c.total} registered</p>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Test Voting Codes */}
       {(() => {
@@ -1474,22 +1582,12 @@ export default function VotersPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="edit_class">Class</Label>
-                <Select
+                <Label htmlFor="edit_class">Class (Year &amp; Stream)</Label>
+                <ClassPicker
                   value={editingVoter.class}
-                  onValueChange={(value) => setEditingVoter({ ...editingVoter, class: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {classes.map((cls) => (
-                      <SelectItem key={cls} value={cls}>
-                        {cls}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(cls) => setEditingVoter({ ...editingVoter, class: cls })}
+                  streamOptions={streamOptions}
+                />
               </div>
               <Button onClick={editVoter} className="w-full" disabled={saving}>
                 {saving ? "Updating..." : "Update Voter"}
