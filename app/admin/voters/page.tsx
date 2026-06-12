@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -144,6 +145,8 @@ export default function VotersPage() {
     full_name: "",
     class: "",
   })
+  // Quick-add a whole class at once
+  const [classBulk, setClassBulk] = useState({ class: "", count: "40", prefix: "" })
   const [stats, setStats] = useState({
     total: 0,
     voted: 0,
@@ -441,6 +444,68 @@ export default function VotersPage() {
         description: "Failed to add voter",
         variant: "destructive",
       })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Quick-add a whole class: generate N registered voters in one class,
+  // each with an auto student ID (STH#####) and a unique voting code.
+  const addClass = async () => {
+    const cls = classBulk.class.trim()
+    const n = Math.min(300, Math.max(1, parseInt(classBulk.count) || 0))
+    if (!cls) {
+      toast({ title: "Pick a class", description: "Choose a year and stream first (e.g. S2B).", variant: "destructive" })
+      return
+    }
+    if (!classBulk.count || n < 1) {
+      toast({ title: "Enter a count", description: "How many voters should this class have?", variant: "destructive" })
+      return
+    }
+
+    setSaving(true)
+    try {
+      const usedIds = new Set(voters.map((v) => v.student_id))
+      const usedCodes = new Set(voters.map((v) => v.voting_code))
+      let seq = 1
+      const genId = () => {
+        let id: string
+        do {
+          id = "STH" + String(seq++).padStart(5, "0")
+        } while (usedIds.has(id))
+        usedIds.add(id)
+        return id
+      }
+      const genCode = () => {
+        let c: string
+        do {
+          c = generateVotingCode()
+        } while (usedCodes.has(c))
+        usedCodes.add(c)
+        return c
+      }
+
+      const prefix = classBulk.prefix.trim() || `${cls} Student`
+      // Continue numbering after any existing voters that share this name prefix
+      const existingInClass = voters.filter((v) => v.class === cls && v.full_name.startsWith(prefix)).length
+      const rows = Array.from({ length: n }, (_, i) => ({
+        student_id: genId(),
+        full_name: `${prefix} ${existingInClass + i + 1}`,
+        class: cls,
+        voting_code: genCode(),
+        has_voted: false,
+      }))
+
+      const { error } = await supabase.from("users").insert(rows)
+      if (error) throw error
+
+      await fetchVoters()
+      toast({ title: "Class added", description: `${n} voter${n === 1 ? "" : "s"} added to ${cls}.` })
+      setClassBulk({ class: "", count: "40", prefix: "" })
+      setShowAddDialog(false)
+    } catch (error) {
+      console.error("Error adding class:", error)
+      toast({ title: "Error", description: "Failed to add the class.", variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -1101,40 +1166,97 @@ export default function VotersPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Voter</DialogTitle>
+                <DialogTitle>Add Voters</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="student_id">Student ID</Label>
-                  <Input
-                    id="student_id"
-                    value={newVoter.student_id}
-                    onChange={(e) => setNewVoter((prev) => ({ ...prev, student_id: e.target.value.toUpperCase() }))}
-                    placeholder="Enter student ID (e.g., LSS001)"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    value={newVoter.full_name}
-                    onChange={(e) => setNewVoter((prev) => ({ ...prev, full_name: e.target.value }))}
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div>
-                  <Label>Class (Year &amp; Stream)</Label>
-                  <ClassPicker
-                    value={newVoter.class}
-                    onChange={(cls) => setNewVoter((prev) => ({ ...prev, class: cls }))}
-                    streamOptions={streamOptions}
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">Pick a constituency (S1–S6), then a stream (e.g. A, B, or a custom one).</p>
-                </div>
-                <Button onClick={addVoter} className="w-full" disabled={saving}>
-                  {saving ? "Adding..." : "Add Voter"}
-                </Button>
-              </div>
+              <Tabs defaultValue="single" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="single">Single Voter</TabsTrigger>
+                  <TabsTrigger value="class">Whole Class</TabsTrigger>
+                </TabsList>
+
+                {/* Single voter */}
+                <TabsContent value="single" className="space-y-4 pt-4">
+                  <div>
+                    <Label htmlFor="student_id">Student ID</Label>
+                    <Input
+                      id="student_id"
+                      value={newVoter.student_id}
+                      onChange={(e) => setNewVoter((prev) => ({ ...prev, student_id: e.target.value.toUpperCase() }))}
+                      placeholder="Enter student ID (e.g., LSS001)"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={newVoter.full_name}
+                      onChange={(e) => setNewVoter((prev) => ({ ...prev, full_name: e.target.value }))}
+                      placeholder="Enter full name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Class (Year &amp; Stream)</Label>
+                    <ClassPicker
+                      value={newVoter.class}
+                      onChange={(cls) => setNewVoter((prev) => ({ ...prev, class: cls }))}
+                      streamOptions={streamOptions}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">Pick a constituency (S1–S6), then a stream (e.g. A, B, or a custom one).</p>
+                  </div>
+                  <Button onClick={addVoter} className="w-full" disabled={saving}>
+                    {saving ? "Adding..." : "Add Voter"}
+                  </Button>
+                </TabsContent>
+
+                {/* Whole class */}
+                <TabsContent value="class" className="space-y-4 pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Register a whole class at once. Each voter gets an automatic student ID and a unique voting code —
+                    rename them individually later if you like.
+                  </p>
+                  <div>
+                    <Label>Class (Year &amp; Stream)</Label>
+                    <ClassPicker
+                      value={classBulk.class}
+                      onChange={(cls) => setClassBulk((prev) => ({ ...prev, class: cls }))}
+                      streamOptions={streamOptions}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="class-count">Number of voters</Label>
+                      <Input
+                        id="class-count"
+                        type="number"
+                        min={1}
+                        max={300}
+                        value={classBulk.count}
+                        onChange={(e) => setClassBulk((prev) => ({ ...prev, count: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="class-prefix">Name prefix (optional)</Label>
+                      <Input
+                        id="class-prefix"
+                        value={classBulk.prefix}
+                        onChange={(e) => setClassBulk((prev) => ({ ...prev, prefix: e.target.value }))}
+                        placeholder={classBulk.class ? `${classBulk.class} Student` : "e.g. S2B Student"}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Creates names like “{(classBulk.prefix.trim() || (classBulk.class ? `${classBulk.class} Student` : "S2B Student"))} 1”,
+                    “… 2”, and so on.
+                  </p>
+                  <Button onClick={addClass} className="w-full" disabled={saving}>
+                    {saving
+                      ? "Adding..."
+                      : `Add ${Math.min(300, Math.max(1, parseInt(classBulk.count) || 0))} voter${
+                          Math.min(300, Math.max(1, parseInt(classBulk.count) || 0)) === 1 ? "" : "s"
+                        }${classBulk.class ? ` to ${classBulk.class}` : ""}`}
+                  </Button>
+                </TabsContent>
+              </Tabs>
             </DialogContent>
           </Dialog>
         </div>
