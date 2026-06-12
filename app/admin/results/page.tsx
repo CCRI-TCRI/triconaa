@@ -344,7 +344,7 @@ export default function ResultsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-700"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-600"></div>
       </div>
     )
   }
@@ -352,23 +352,24 @@ export default function ResultsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#5c0f1f] via-[#7a1f2b] to-[#3b0a14] p-6 text-white shadow-2xl">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-amber-400/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#168AAD] via-[#1A759F] to-[#184E77] p-6 text-white shadow-xl">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-[#D9ED92]/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 left-1/3 h-40 w-40 rounded-full bg-[#76C893]/15 blur-3xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-amber-300/40">
+            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-2 ring-[#D9ED92]/40">
               <img src={logoUrl} alt={schoolName} className="h-11 w-11 object-contain" />
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Election Results</h1>
-              <p className="text-sm text-rose-100/80">{schoolName} · official tally</p>
+              <p className="text-sm text-sky-100/80">{schoolName} · official tally</p>
             </div>
           </div>
           <div className="flex gap-2">
             <Button onClick={fetchResults} variant="outline" className="gap-2 border-white/30 bg-white/10 text-white hover:bg-white/20">
               <RefreshCw className="h-4 w-4" />Refresh
             </Button>
-            <Button onClick={exportResultsPDF} disabled={exporting || results.length === 0} className="gap-2 bg-amber-400 font-semibold text-rose-950 hover:bg-amber-300">
+            <Button onClick={exportResultsPDF} disabled={exporting || results.length === 0} className="gap-2 bg-[#D9ED92] font-semibold text-[#184E77] hover:bg-[#B5E48C]">
               {exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
               Export PDF
             </Button>
@@ -378,77 +379,84 @@ export default function ResultsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Votes Cast</CardTitle>
-            <Vote className="h-4 w-4 text-rose-600" />
+            <CardTitle className="text-sm font-medium text-slate-600">Total Votes Cast</CardTitle>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-50 text-sky-600"><Vote className="h-4 w-4" /></div>
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{totalVotes}</div></CardContent>
+          <CardContent><div className="text-3xl font-bold text-slate-800">{totalVotes}</div></CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Registered Voters</CardTitle>
-            <Users className="h-4 w-4 text-rose-600" />
+            <CardTitle className="text-sm font-medium text-slate-600">Registered Voters</CardTitle>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-teal-600"><Users className="h-4 w-4" /></div>
           </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{totalVoters}</div></CardContent>
+          <CardContent><div className="text-3xl font-bold text-slate-800">{totalVoters}</div></CardContent>
         </Card>
-        <Card>
+        <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Voter Turnout</CardTitle>
-            <TrendingUp className="h-4 w-4 text-rose-600" />
+            <CardTitle className="text-sm font-medium text-slate-600">Voter Turnout</CardTitle>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600"><TrendingUp className="h-4 w-4" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{turnout.toFixed(1)}%</div>
+            <div className="text-3xl font-bold text-slate-800">{turnout.toFixed(1)}%</div>
             <Progress value={turnout} className="mt-2" />
             <p className="mt-1 text-xs text-muted-foreground">{votedCount} of {totalVoters} students voted</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Results */}
-      <div className="space-y-6">
+      {/* Results grid */}
+      <div className="grid gap-5 xl:grid-cols-2">
         {results.map((position, index) => (
-          <Card key={index} className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-rose-50 to-amber-50 border-b">
+          <Card key={index} className="overflow-hidden border-slate-200">
+            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-emerald-50">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-rose-900">
-                    <Crown className="w-5 h-5 text-rose-700" />{position.position_name}
+                  <CardTitle className="flex items-center gap-2 text-sky-800">
+                    <Crown className="h-5 w-5 text-sky-600" />{position.position_name}
                   </CardTitle>
                   <CardDescription>{position.category} • {position.total_votes} votes cast</CardDescription>
                 </div>
-                <Badge variant="outline" className="border-rose-200 text-rose-700">{position.candidates.length} candidates</Badge>
+                <Badge variant="outline" className="border-sky-200 bg-white/60 text-sky-700">{position.candidates.length} candidates</Badge>
               </div>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
+            <CardContent className="pt-5">
+              <div className="space-y-3">
                 {position.candidates.map((candidate, ci) => {
                   const isWinner = ci === 0 && candidate.vote_count > 0
                   return (
                     <div
                       key={candidate.id}
-                      className={`flex items-center gap-4 rounded-lg p-3 ${isWinner ? "bg-amber-50 ring-1 ring-amber-200" : ""}`}
+                      className={`flex items-center gap-3 rounded-xl p-3 transition-colors ${
+                        isWinner ? "bg-emerald-50 ring-1 ring-emerald-200" : "bg-slate-50/60 hover:bg-slate-50"
+                      }`}
                     >
-                      <div className="flex w-8 items-center justify-center">
-                        {isWinner ? <Award className="h-5 w-5 text-amber-500" /> : <span className="text-sm font-medium text-muted-foreground">#{ci + 1}</span>}
+                      <div className="flex w-7 items-center justify-center">
+                        {isWinner ? <Trophy className="h-5 w-5 text-amber-500" /> : <span className="text-sm font-semibold text-slate-400">#{ci + 1}</span>}
                       </div>
-                      <Avatar className={isWinner ? "ring-2 ring-amber-400" : ""}>
+                      <Avatar className={`h-11 w-11 ${isWinner ? "ring-2 ring-emerald-400" : "ring-1 ring-slate-200"}`}>
                         <AvatarImage src={candidate.photo_url || "/placeholder.svg"} alt={candidate.full_name} />
-                        <AvatarFallback className="bg-rose-100 text-rose-800">
+                        <AvatarFallback className={isWinner ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}>
                           {candidate.full_name.split(" ").map((n) => n[0]).join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{candidate.full_name}</p>
-                          {candidate.class && <span className="text-xs text-muted-foreground">{candidate.class}</span>}
-                          {isWinner && <Badge className="bg-amber-500 text-white hover:bg-amber-500">Winner</Badge>}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-semibold text-slate-800">{candidate.full_name}</p>
+                          {candidate.class && <span className="text-xs text-slate-400">{candidate.class}</span>}
+                          {isWinner && <Badge className="bg-emerald-500 text-white hover:bg-emerald-500">Leading</Badge>}
                         </div>
-                        <div className="mt-1 flex items-center gap-4">
-                          <Progress value={candidate.percentage} className="flex-1" />
-                          <div className="min-w-[80px] text-right">
-                            <p className="font-bold">{candidate.vote_count} votes</p>
-                            <p className="text-sm text-muted-foreground">{candidate.percentage.toFixed(1)}%</p>
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/70">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${isWinner ? "bg-emerald-500" : "bg-sky-400"}`}
+                              style={{ width: `${candidate.percentage}%` }}
+                            />
+                          </div>
+                          <div className="min-w-[74px] text-right">
+                            <p className="text-sm font-bold text-slate-800">{candidate.vote_count} <span className="font-normal text-slate-400">votes</span></p>
+                            <p className="text-xs text-slate-500">{candidate.percentage.toFixed(1)}%</p>
                           </div>
                         </div>
                       </div>
@@ -456,7 +464,7 @@ export default function ResultsPage() {
                   )
                 })}
                 {position.candidates.length === 0 && (
-                  <p className="text-center text-muted-foreground py-4">No candidates registered for this position</p>
+                  <p className="py-4 text-center text-sm text-muted-foreground">No candidates registered for this position</p>
                 )}
               </div>
             </CardContent>
@@ -465,8 +473,9 @@ export default function ResultsPage() {
       </div>
 
       {results.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
+        <Card className="border-slate-200">
+          <CardContent className="py-12 text-center">
+            <Award className="mx-auto mb-3 h-8 w-8 text-slate-300" />
             <p className="text-muted-foreground">No election data available. Add positions and candidates first.</p>
           </CardContent>
         </Card>
