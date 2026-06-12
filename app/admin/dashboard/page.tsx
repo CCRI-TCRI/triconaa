@@ -9,6 +9,7 @@ import {
   Calendar, ChevronDown, Send, X, Star, BarChart3, PieChart as PieIcon, LineChart as LineIcon, Layers,
 } from "lucide-react"
 import { userDb, candidateDb, voteDb, positionDb, electionControl, type ElectionStatus } from "@/lib/db"
+import { useSchoolBranding } from "@/components/school-branding-provider"
 import type { User, Candidate, Position, Vote as VoteRow } from "@/lib/supabase"
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -42,11 +43,11 @@ const RANGE_LABEL: Record<Range, string> = { today: "Today", week: "Last 7 days"
 const RANGE_MS: Record<Range, number | null> = { today: 864e5, week: 7 * 864e5, month: 30 * 864e5, all: null }
 
 const OPTIONAL_WIDGETS = [
-  { key: "category", title: "Votes by Category", desc: "See how votes split across position categories.", tag: "#Insights", icon: PieIcon },
-  { key: "volume", title: "Voting Performance", desc: "Monitor vote volume and activity over time.", tag: "#Operations", icon: BarChart3 },
-  { key: "trend", title: "Trend Analysis", desc: "Track the top races' momentum as votes arrive.", tag: "#Strategy", icon: LineIcon },
-  { key: "constituency", title: "Constituency Segmentation", desc: "Group turnout by year group and stream.", tag: "#Segments", icon: Layers },
-  { key: "activity", title: "Recent Activity", desc: "Live feed of the latest ballots cast.", tag: "#Live", icon: Radio },
+  { key: "category", title: "Votes by Category", desc: "How votes split across prefect categories.", tag: "#Insights", icon: PieIcon },
+  { key: "volume", title: "Voting Activity", desc: "Ballots cast over the course of the election.", tag: "#Operations", icon: BarChart3 },
+  { key: "trend", title: "Race Momentum", desc: "Track the top prefect races as votes arrive.", tag: "#Strategy", icon: LineIcon },
+  { key: "constituency", title: "Voters by Constituency", desc: "Turnout grouped by year (S1–S6).", tag: "#Segments", icon: Layers },
+  { key: "activity", title: "Live Vote Feed", desc: "The latest ballots cast in real time.", tag: "#Live", icon: Radio },
 ] as const
 type WidgetKey = (typeof OPTIONAL_WIDGETS)[number]["key"]
 
@@ -166,6 +167,7 @@ function RaceCard({ post }: { post: PostResult }) {
 }
 
 export default function AdminDashboard() {
+  const { schoolName, electionTerm } = useSchoolBranding()
   const [raw, setRaw] = useState<{ users: User[]; candidates: Candidate[]; positions: Position[]; votes: VoteRow[] }>({
     users: [], candidates: [], positions: [], votes: [],
   })
@@ -365,13 +367,22 @@ export default function AdminDashboard() {
     }
     return `Turnout is ${d.turnout}% with ${d.votes} votes cast. Try: "who is leading Head Prefect?", "turnout", or "which constituency leads?"`
   }
-  function ask(e: React.FormEvent) {
-    e.preventDefault()
-    const text = q.trim()
-    if (!text) return
-    setChat((c) => [...c, { role: "user", text }, { role: "bot", text: answer(text) }])
+  function send(text: string) {
+    const t = text.trim()
+    if (!t) return
+    setChat((c) => [...c, { role: "user", text: t }, { role: "bot", text: answer(t) }])
     setQ("")
   }
+  function ask(e: React.FormEvent) {
+    e.preventDefault()
+    send(q)
+  }
+  // Suggestion chips built from this election's real races
+  const suggestions = [
+    ...d.posts.slice(0, 2).map((p) => `Who is leading ${p.name}?`),
+    "What is the turnout?",
+    "Which constituency leads?",
+  ]
 
   if (loading) {
     return <div className="flex h-[60vh] items-center justify-center"><RefreshCw className="h-7 w-7 animate-spin text-sky-500" /></div>
@@ -381,7 +392,15 @@ export default function AdminDashboard() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <span className="truncate">{schoolName}</span>
+            <span className="text-slate-300">·</span>
+            <span className="truncate">{electionTerm}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadge[status]}`}>{status}</span>
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 sm:flex">
             <Calendar className="h-4 w-4 text-slate-400" /> {dateSpan}
@@ -444,7 +463,7 @@ export default function AdminDashboard() {
           </Panel>
 
           {/* Participation segments */}
-          <Panel title="Participation" action={<span className="text-xs text-slate-400">by category</span>}>
+          <Panel title="Participation" action={<span className="text-xs text-slate-400">by category</span>} className="flex-1">
             {d.segments.length === 0 ? (
               <p className="py-4 text-center text-sm text-slate-400">No votes yet.</p>
             ) : (
@@ -463,7 +482,7 @@ export default function AdminDashboard() {
         {/* Right column */}
         <div className="flex flex-col gap-4">
           {/* Most active day */}
-          <Panel title="Most Active Day">
+          <Panel title="Busiest Voting Day">
             <div className="flex h-[150px] items-end justify-between gap-2">
               {d.byDay.map((dd) => {
                 const max = Math.max(1, ...d.byDay.map((x) => x.votes))
@@ -485,18 +504,27 @@ export default function AdminDashboard() {
           </Panel>
 
           {/* AI Assistant */}
-          <Panel title="AI Assistant" action={<Sparkles className="h-4 w-4 text-sky-500" />}>
+          <Panel title="Election Assistant" action={<Sparkles className="h-4 w-4 text-sky-500" />} className="flex-1">
             <div className="mb-3 flex justify-center">
-              <div className="h-16 w-16 animate-pulse rounded-full bg-[radial-gradient(circle_at_30%_30%,#76C893,#168AAD_60%,#1E6091)] shadow-lg" />
+              <div className="h-14 w-14 animate-pulse rounded-full bg-[radial-gradient(circle_at_30%_30%,#76C893,#168AAD_60%,#1E6091)] shadow-lg" />
             </div>
             <div className="mb-2 max-h-40 space-y-2 overflow-y-auto">
               {chat.length === 0 ? (
-                <p className="text-center text-xs text-slate-400">Ask about turnout, a race, or constituencies.</p>
+                <p className="text-center text-xs text-slate-400">Ask about turnout, a prefect race, or a constituency.</p>
               ) : chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-lg px-3 py-1.5 text-xs ${m.role === "user" ? "ml-auto bg-sky-600 text-white" : "bg-slate-100 text-slate-700"}`}>{m.text}</div>
               ))}
               <div ref={chatEndRef} />
             </div>
+            {chat.length === 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button key={s} onClick={() => send(s)} className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700">
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
             <form onSubmit={ask} className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5">
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask me anything…" className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400" />
               <button type="submit" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-600 text-white hover:bg-sky-700"><Send className="h-3.5 w-3.5" /></button>
@@ -533,7 +561,7 @@ export default function AdminDashboard() {
             </Panel>
           )}
           {widgets.includes("volume") && (
-            <Panel title="Voting Performance">
+            <Panel title="Voting Activity">
               {d.volume.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No votes in this period.</p> : (
                 <ResponsiveContainer width="100%" height={190}>
                   <BarChart data={d.volume} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -548,7 +576,7 @@ export default function AdminDashboard() {
             </Panel>
           )}
           {widgets.includes("trend") && (
-            <Panel title="Trend Analysis">
+            <Panel title="Race Momentum">
               {d.performance.length === 0 ? <p className="py-16 text-center text-sm text-slate-400">Race trends appear as votes come in.</p> : (
                 <ResponsiveContainer width="100%" height={210}>
                   <LineChart data={d.performance} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
@@ -563,7 +591,7 @@ export default function AdminDashboard() {
             </Panel>
           )}
           {widgets.includes("constituency") && (
-            <Panel title="Constituency Segmentation">
+            <Panel title="Voters by Constituency">
               {d.constituency.length === 0 ? <p className="py-12 text-center text-sm text-slate-400">No voters registered yet.</p> : (
                 <div className="divide-y divide-slate-100">
                   {d.constituency.map((c) => {
@@ -581,7 +609,7 @@ export default function AdminDashboard() {
             </Panel>
           )}
           {widgets.includes("activity") && (
-            <Panel title="Recent Activity">
+            <Panel title="Live Vote Feed">
               {d.activity.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">No votes in this period.</p> : (
                 <ul className="space-y-2.5">
                   {d.activity.map((a) => (
