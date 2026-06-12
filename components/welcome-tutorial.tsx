@@ -29,7 +29,7 @@ const tutorialSteps = [
     title: "Welcome to E-Voting",
     description: "You're about to participate in your school's official elections.",
     icon: Vote,
-    color: "from-blue-500 to-purple-500",
+    color: "from-[#168AAD] to-[#1E6091]",
     content: "This digital voting system ensures your vote is secure, private, and counted accurately.",
   },
   {
@@ -37,7 +37,7 @@ const tutorialSteps = [
     title: "Your Voting Process",
     description: "You'll vote for different positions across various categories.",
     icon: Users,
-    color: "from-green-500 to-blue-500",
+    color: "from-[#34A0A4] to-[#168AAD]",
     content: "Each position will be presented one at a time. Simply click on your preferred candidate to select them.",
   },
   {
@@ -45,7 +45,7 @@ const tutorialSteps = [
     title: "Security & Privacy",
     description: "Your vote is completely anonymous and secure.",
     icon: Shield,
-    color: "from-purple-500 to-pink-500",
+    color: "from-[#52B69A] to-[#34A0A4]",
     content: "Once submitted, votes cannot be changed. Your identity is protected throughout the process.",
   },
   {
@@ -53,7 +53,7 @@ const tutorialSteps = [
     title: "Time Limit",
     description: "You have 5 minutes to complete your voting.",
     icon: Clock,
-    color: "from-orange-500 to-red-500",
+    color: "from-[#76C893] to-[#52B69A]",
     content: "A timer will show your remaining time. If time expires, you'll be automatically logged out.",
   },
   {
@@ -61,7 +61,7 @@ const tutorialSteps = [
     title: "Review & Submit",
     description: "Review all your selections before final submission.",
     icon: CheckCircle,
-    color: "from-green-500 to-teal-500",
+    color: "from-[#99D98C] to-[#52B69A]",
     content: "You'll see a summary of all your votes before confirming. Make sure everything is correct!",
   },
 ]
@@ -86,7 +86,7 @@ export function WelcomeTutorial({ onComplete, studentName }: WelcomeTutorialProp
   const currentTutorial = tutorialSteps[currentStep]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#168AAD] via-[#1A759F] to-[#184E77] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-2xl">
         <Card className="backdrop-blur-lg bg-white/95 border-white/20 shadow-2xl">
           <CardContent className="p-8">
@@ -104,9 +104,9 @@ export function WelcomeTutorial({ onComplete, studentName }: WelcomeTutorialProp
                     key={index}
                     className={`w-3 h-3 rounded-full transition-all duration-300 ${
                       index === currentStep
-                        ? "bg-blue-500 scale-125"
+                        ? "bg-[#168AAD] scale-125"
                         : index < currentStep
-                          ? "bg-green-500"
+                          ? "bg-[#76C893]"
                           : "bg-gray-300"
                     }`}
                     initial={{ scale: 0 }}
@@ -165,7 +165,7 @@ export function WelcomeTutorial({ onComplete, studentName }: WelcomeTutorialProp
                     <div className="space-y-3">
                       <div className="flex items-center justify-between p-3 bg-white rounded border">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                          <div className="w-8 h-8 bg-[#168AAD] rounded-full flex items-center justify-center">
                             <UserCheck className="w-4 h-4 text-white" />
                           </div>
                           <span className="font-medium">Candidate Name</span>
@@ -185,17 +185,17 @@ export function WelcomeTutorial({ onComplete, studentName }: WelcomeTutorialProp
                     transition={{ delay: 0.5 }}
                     className="mt-8 grid grid-cols-3 gap-4"
                   >
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <Shield className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                      <div className="text-sm font-medium text-green-700">Encrypted</div>
+                    <div className="text-center p-4 bg-emerald-50 rounded-lg">
+                      <Shield className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                      <div className="text-sm font-medium text-emerald-700">Encrypted</div>
                     </div>
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <Eye className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-                      <div className="text-sm font-medium text-blue-700">Anonymous</div>
+                    <div className="text-center p-4 bg-sky-50 rounded-lg">
+                      <Eye className="w-8 h-8 text-sky-500 mx-auto mb-2" />
+                      <div className="text-sm font-medium text-sky-700">Anonymous</div>
                     </div>
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <CheckCircle className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                      <div className="text-sm font-medium text-purple-700">Verified</div>
+                    <div className="text-center p-4 bg-teal-50 rounded-lg">
+                      <CheckCircle className="w-8 h-8 text-teal-500 mx-auto mb-2" />
+                      <div className="text-sm font-medium text-teal-700">Verified</div>
                     </div>
                   </motion.div>
                 )}
@@ -227,8 +227,8 @@ export function WelcomeTutorial({ onComplete, studentName }: WelcomeTutorialProp
                 onClick={nextStep}
                 className={`flex items-center space-x-2 ${
                   currentStep === tutorialSteps.length - 1
-                    ? "bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
-                    : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    ? "bg-gradient-to-r from-[#52B69A] to-[#168AAD] hover:from-[#34A0A4] hover:to-[#1A759F]"
+                    : "bg-gradient-to-r from-[#168AAD] to-[#1E6091] hover:from-[#1A759F] hover:to-[#184E77]"
                 }`}
               >
                 <span>{currentStep === tutorialSteps.length - 1 ? "Start Voting" : "Next"}</span>

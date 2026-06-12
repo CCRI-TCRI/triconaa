@@ -34,7 +34,7 @@ const CELEBRATIONS = [
   "Power to the people!",
   "Sealed, stamped, delivered!",
 ]
-const PARTY_COLORS = ["#7a1f2b", "#f5c542", "#2563eb", "#ffffff", "#fbbf24", "#e11d48"]
+const PARTY_COLORS = ["#168AAD", "#D9ED92", "#34A0A4", "#ffffff", "#76C893", "#1E6091"]
 
 export default function VotingApp() {
   const { schoolName, logoUrl, seasonalTheme, electionStatus } = useSchoolBranding()

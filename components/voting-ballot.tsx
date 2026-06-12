@@ -33,7 +33,7 @@ interface VotingBallotProps {
   onVoteComplete: () => void
 }
 
-const MAROON = "#7a1f2b"
+const MAROON = "#168AAD"
 
 const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60)
@@ -59,20 +59,20 @@ function BallotShell({
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-100">
       {/* Header */}
-      <header className="flex-none bg-gradient-to-r from-[#5c0f1f] via-[#7a1f2b] to-[#5c0f1f] text-white shadow-md">
+      <header className="flex-none bg-gradient-to-r from-[#1A759F] via-[#168AAD] to-[#1A759F] text-white shadow-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-amber-300/40">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-[#D9ED92]/50">
               <img src={logoUrl} alt={schoolName} className="h-8 w-8 object-contain" />
             </div>
             <div className="leading-tight">
               <h1 className="text-sm font-semibold sm:text-base">{schoolName}</h1>
-              <p className="text-[11px] text-amber-200/80">"{motto}" · Official Ballot</p>
+              <p className="text-[11px] text-[#D9ED92]/90">"{motto}" · Official Ballot</p>
             </div>
           </div>
           <div
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold tabular-nums ${
-              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-amber-100 ring-1 ring-white/15"
+              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-[#D9ED92] ring-1 ring-white/15"
             }`}
           >
             <Clock className="h-4 w-4" />
@@ -242,7 +242,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             <p className="mb-6 mt-2 text-sm text-slate-500">
               There are currently no candidates available for voting. Please contact the election committee.
             </p>
-            <Button onClick={() => window.location.reload()} className="bg-[#7a1f2b] text-white hover:bg-[#5c0f1f]">
+            <Button onClick={() => window.location.reload()} className="bg-[#168AAD] text-white hover:bg-[#1A759F]">
               Refresh Page
             </Button>
           </div>
@@ -262,8 +262,8 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
           >
             <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#7a1f2b]/10">
-                <ShieldCheck className="h-6 w-6 text-[#7a1f2b]" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#168AAD]/10">
+                <ShieldCheck className="h-6 w-6 text-[#168AAD]" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Review Your Ballot</h2>
@@ -290,7 +290,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                     {selectedCandidate && (
                       <Avatar className="h-9 w-9 ring-1 ring-slate-200">
                         <AvatarImage src={selectedCandidate.photo_url || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-[#7a1f2b] text-xs text-white">
+                        <AvatarFallback className="bg-[#168AAD] text-xs text-white">
                           {initials(selectedCandidate.full_name)}
                         </AvatarFallback>
                       </Avatar>
@@ -317,7 +317,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 <Button
                   onClick={submitVotes}
                   disabled={isSubmitting}
-                  className="flex-1 bg-[#7a1f2b] font-semibold text-white shadow-sm hover:bg-[#5c0f1f]"
+                  className="flex-1 bg-[#168AAD] font-semibold text-white shadow-sm hover:bg-[#1A759F]"
                 >
                   {isSubmitting ? (
                     <>
@@ -366,9 +366,9 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                   title={position.name}
                   className={`h-1.5 flex-1 rounded-full transition-all ${
                     isActive
-                      ? "bg-[#7a1f2b]"
+                      ? "bg-[#168AAD]"
                       : hasVote
-                        ? "bg-[#7a1f2b]/50"
+                        ? "bg-[#168AAD]/50"
                         : locked
                           ? "cursor-not-allowed bg-slate-200"
                           : "bg-slate-200 hover:bg-slate-300"
@@ -391,7 +391,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
             {/* Title block */}
             <div className="flex flex-none items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div className="min-w-0">
-                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-[#7a1f2b]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#7a1f2b]">
+                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-[#168AAD]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#168AAD]">
                   {getCategoryIcon(currentPosition.category, "w-3.5 h-3.5")}
                   {currentPosition.category}
                 </div>
@@ -413,21 +413,21 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                       disabled={isTransitioning}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
                         selected
-                          ? "border-[#7a1f2b] bg-[#7a1f2b]/5 ring-1 ring-[#7a1f2b]"
+                          ? "border-[#168AAD] bg-[#168AAD]/5 ring-1 ring-[#168AAD]"
                           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                       } ${isTransitioning ? "pointer-events-none" : ""}`}
                     >
                       <div
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                          selected ? "border-[#7a1f2b] bg-[#7a1f2b]" : "border-slate-300 bg-white"
+                          selected ? "border-[#168AAD] bg-[#168AAD]" : "border-slate-300 bg-white"
                         }`}
                       >
                         {selected && <Check className="h-3.5 w-3.5 text-white" />}
                       </div>
 
-                      <Avatar className={`h-12 w-12 shrink-0 ${selected ? "ring-2 ring-[#7a1f2b]" : "ring-1 ring-slate-200"}`}>
+                      <Avatar className={`h-12 w-12 shrink-0 ${selected ? "ring-2 ring-[#168AAD]" : "ring-1 ring-slate-200"}`}>
                         <AvatarImage src={candidate.photo_url || "/placeholder.svg"} />
-                        <AvatarFallback className="bg-[#7a1f2b] text-sm font-semibold text-white">
+                        <AvatarFallback className="bg-[#168AAD] text-sm font-semibold text-white">
                           {initials(candidate.full_name)}
                         </AvatarFallback>
                       </Avatar>
@@ -471,7 +471,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 }}
                 disabled={!votes[currentPosition.id]}
                 size="sm"
-                className="bg-[#7a1f2b] font-semibold text-white hover:bg-[#5c0f1f] disabled:opacity-40"
+                className="bg-[#168AAD] font-semibold text-white hover:bg-[#1A759F] disabled:opacity-40"
               >
                 {currentPositionIndex === positions.length - 1 ? "Review Ballot" : "Next"}
                 <ChevronRight className="ml-1.5 h-4 w-4" />
