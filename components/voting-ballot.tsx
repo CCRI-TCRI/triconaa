@@ -119,9 +119,48 @@ function CandidatePhoto({
   )
 }
 
+// Lists positions whose single candidate is elected unopposed. Shown for transparency
+// but never votable.
+function UnopposedList({ positions }: { positions: PositionWithCandidates[] }) {
+  if (positions.length === 0) return null
+  return (
+    <div>
+      <div className="flex items-center gap-2 bg-emerald-50/60 px-6 py-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+        <ShieldCheck className="h-3.5 w-3.5" />
+        Elected unopposed · not on the ballot
+      </div>
+      <div className="divide-y divide-slate-100">
+        {positions.map((position) => {
+          const candidate = position.candidates[0]
+          return (
+            <div key={position.id} className="flex items-center justify-between gap-4 px-6 py-2.5">
+              <div className="flex items-center gap-3">
+                <CandidatePhoto
+                  src={candidate?.photo_url}
+                  name={candidate?.full_name || ""}
+                  className="h-9 w-9 flex-none rounded-full ring-1 ring-slate-200"
+                  textClass="text-xs"
+                />
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400">{position.name}</p>
+                  <p className="font-semibold text-slate-900">{candidate?.full_name}</p>
+                </div>
+              </div>
+              <span className="flex-none rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                Unopposed
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const { schoolName, motto, logoUrl } = useSchoolBranding()
   const [positions, setPositions] = useState<PositionWithCandidates[]>([])
+  const [unopposedPositions, setUnopposedPositions] = useState<PositionWithCandidates[]>([])
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [votes, setVotes] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -152,13 +191,18 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
     setIsLoading(true)
     try {
       const positionsWithCandidates = await getPositionsWithCandidates()
-      const validPositions = positionsWithCandidates.filter((p) => p.candidates && p.candidates.length > 0)
-      if (validPositions.length === 0) {
-        toast.error("No candidates available for voting at this time.")
+      const withCandidates = positionsWithCandidates.filter((p) => p.candidates && p.candidates.length > 0)
+      // A position with a single candidate is uncontested — that candidate is elected
+      // unopposed, so it is never put on the ballot for voting.
+      const votable = withCandidates.filter((p) => p.candidates.length >= 2)
+      const unopposed = withCandidates.filter((p) => p.candidates.length === 1)
+      setUnopposedPositions(unopposed)
+      setPositions(votable)
+      if (votable.length === 0) {
+        if (unopposed.length === 0) toast.error("No candidates available for voting at this time.")
         return
       }
-      setPositions(validPositions)
-      toast.success(`Loaded ${validPositions.length} positions with candidates`)
+      toast.success(`Loaded ${votable.length} contested position${votable.length === 1 ? "" : "s"} for voting`)
     } catch (error) {
       console.error("Error fetching election data:", error)
       toast.error("Failed to load election data. Please try again.")
@@ -253,6 +297,35 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   }
 
   if (!currentPosition || positions.length === 0) {
+    // Nothing contested to vote on. If every position is uncontested, tell the voter
+    // those seats were filled unopposed rather than showing a generic empty state.
+    if (unopposedPositions.length > 0) {
+      return (
+        <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
+          <div className="h-full overflow-y-auto px-4 py-4">
+            <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#168AAD]/10">
+                  <ShieldCheck className="h-6 w-6 text-[#168AAD]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Nothing to Vote On</h2>
+                  <p className="text-xs text-slate-500">
+                    Every position has a single, unopposed candidate — there are no contested races on your ballot.
+                  </p>
+                </div>
+              </div>
+              <UnopposedList positions={unopposedPositions} />
+              <div className="border-t border-slate-100 px-6 py-4">
+                <Button onClick={onVoteComplete} className="w-full bg-[#168AAD] font-semibold text-white hover:bg-[#1A759F]">
+                  Done
+                </Button>
+              </div>
+            </div>
+          </div>
+        </BallotShell>
+      )
+    }
     return (
       <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
         <div className="flex h-full items-center justify-center p-4">
@@ -321,6 +394,8 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 )
               })}
             </div>
+
+            <UnopposedList positions={unopposedPositions} />
 
             <div className="space-y-3 border-t border-slate-100 px-6 py-4">
               <p className="rounded-md bg-slate-50 px-4 py-2 text-center text-xs text-slate-500">
