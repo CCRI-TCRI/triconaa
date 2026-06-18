@@ -10,6 +10,8 @@ import {
 } from "lucide-react"
 import { userDb, candidateDb, voteDb, positionDb, electionControl, type ElectionStatus } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import { extractLogoColor } from "@/lib/pdf-logo-color"
+import { toast } from "sonner"
 import type { User, Candidate, Position, Vote as VoteRow } from "@/lib/supabase"
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -38,9 +40,10 @@ interface PostResult {
   candidates: { id: string; name: string; photo?: string; class?: string; votes: number; pct: number; leading: boolean }[]
 }
 
-type Range = "today" | "week" | "month" | "all"
-const RANGE_LABEL: Record<Range, string> = { today: "Today", week: "Last 7 days", month: "Last 30 days", all: "All time" }
-const RANGE_MS: Record<Range, number | null> = { today: 864e5, week: 7 * 864e5, month: 30 * 864e5, all: null }
+type Range = "m5" | "m10" | "m15" | "m30" | "m60" | "all"
+const MIN = 60_000
+const RANGE_LABEL: Record<Range, string> = { m5: "Last 5 min", m10: "Last 10 min", m15: "Last 15 min", m30: "Last 30 min", m60: "Last 60 min", all: "All time" }
+const RANGE_MS: Record<Range, number | null> = { m5: 5 * MIN, m10: 10 * MIN, m15: 15 * MIN, m30: 30 * MIN, m60: 60 * MIN, all: null }
 
 const OPTIONAL_WIDGETS = [
   { key: "category", title: "Votes by Category", desc: "How votes split across prefect categories.", tag: "#Insights", icon: PieIcon },
@@ -167,13 +170,14 @@ function RaceCard({ post }: { post: PostResult }) {
 }
 
 export default function AdminDashboard() {
-  const { schoolName, electionTerm } = useSchoolBranding()
+  const { schoolName, electionTerm, logoUrl, motto } = useSchoolBranding()
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [raw, setRaw] = useState<{ users: User[]; candidates: Candidate[]; positions: Position[]; votes: VoteRow[] }>({
     users: [], candidates: [], positions: [], votes: [],
   })
   const [status, setStatus] = useState<ElectionStatus>("active")
   const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState<Range>("month")
+  const [range, setRange] = useState<Range>("m15")
   const [onlyLeaders, setOnlyLeaders] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [widgets, setWidgets] = useState<WidgetKey[]>(["category", "constituency"])
@@ -258,7 +262,7 @@ export default function AdminDashboard() {
       const span = Math.max(1, last - first)
       const B = 8
       const idxOf = (t: string) => Math.min(B - 1, Math.floor(((+new Date(t) - first) / span) * B))
-      const labels = Array.from({ length: B }, (_, i) => new Date(first + (span / B) * i).toLocaleDateString([], { month: "short", day: "numeric" }))
+      const labels = Array.from({ length: B }, (_, i) => new Date(first + (span / B) * i).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
       const counts = new Array(B).fill(0)
       sorted.forEach((v) => counts[idxOf(v.created_at)]++)
       volume = counts.map((c, i) => ({ label: labels[i], votes: c }))
@@ -328,7 +332,7 @@ export default function AdminDashboard() {
 
   const win = RANGE_MS[range]
   const dateSpan = win
-    ? `${new Date(Date.now() - win).toLocaleDateString([], { month: "short", day: "numeric" })} – ${new Date().toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`
+    ? `${new Date(Date.now() - win).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
     : "All time"
 
   function toggleWidget(k: WidgetKey) {
@@ -349,6 +353,193 @@ export default function AdminDashboard() {
     const a = document.createElement("a")
     a.href = url; a.download = `dashboard-${new Date().toISOString().split("T")[0]}.csv`; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Designed PDF report: branded header + KPI tiles + donut/bar infographics that
+  // visualise the exact dashboard data, then a top-candidates table.
+  async function exportPdf() {
+    setExportingPdf(true)
+    try {
+      const { jsPDF } = await import("jspdf")
+      const autoTable = (await import("jspdf-autotable")).default
+      const doc: any = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+      const M = 40
+
+      // load logo
+      let logo: { data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null = null
+      try {
+        let data = logoUrl
+        let mime = "image/png"
+        if (logoUrl && !logoUrl.startsWith("data:")) {
+          const res = await fetch(logoUrl); const b = await res.blob(); mime = b.type
+          data = await new Promise<string>((rs, rj) => { const fr = new FileReader(); fr.onload = () => rs(fr.result as string); fr.onerror = rj; fr.readAsDataURL(b) })
+        } else if (logoUrl) { mime = logoUrl.substring(5, logoUrl.indexOf(";")) || "image/png" }
+        if (data) {
+          const dims = await new Promise<{ w: number; h: number }>((rs) => { const im = new window.Image(); im.onload = () => rs({ w: im.naturalWidth || 100, h: im.naturalHeight || 100 }); im.onerror = () => rs({ w: 100, h: 100 }); im.src = data })
+          logo = { data, fmt: mime.includes("png") ? "PNG" : "JPEG", w: dims.w, h: dims.h }
+        }
+      } catch { logo = null }
+
+      const brand: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
+      const gold: [number, number, number] = [245, 200, 66]
+      const ink: [number, number, number] = [30, 41, 59]
+      const muted: [number, number, number] = [120, 130, 145]
+      const PALETTE: [number, number, number][] = [[37, 99, 235], [16, 185, 129], [245, 158, 11], [239, 68, 68], [139, 92, 246], [14, 165, 233], [236, 72, 153], [34, 197, 94]]
+
+      // ── header ──
+      const headerH = 90
+      doc.setFillColor(...brand); doc.rect(0, 0, pageW, headerH, "F")
+      doc.setFillColor(...gold); doc.rect(0, headerH, pageW, 3, "F")
+      let tx = M
+      if (logo) {
+        const box = 56, cx = M + box / 2, cy = headerH / 2
+        doc.setFillColor(255, 255, 255); doc.circle(cx, cy, box / 2 + 3, "F")
+        const ratio = logo.w / logo.h; let w = box, h = box; if (ratio > 1) h = box / ratio; else w = box * ratio
+        doc.addImage(logo.data, logo.fmt, cx - w / 2, cy - h / 2, w, h)
+        tx = M + box + 16
+      }
+      doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(16)
+      doc.text(schoolName.toUpperCase(), tx, 32)
+      doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(...gold)
+      doc.text(`"${motto}"`, tx, 48)
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.setTextColor(255, 255, 255)
+      doc.text("Election Dashboard Report", tx, 68)
+      doc.setFontSize(8); doc.setTextColor(255, 235, 235)
+      doc.text(`Generated: ${new Date().toLocaleString()}`, pageW - M, 28, { align: "right" })
+      if (electionTerm) doc.text(String(electionTerm), pageW - M, 42, { align: "right" })
+      doc.text(`Period: ${dateSpan}`, pageW - M, 56, { align: "right" })
+
+      let y = headerH + 24
+
+      // ── KPI tiles ──
+      const kpis = [
+        { label: "Registered", value: d.voters.toLocaleString() },
+        { label: "Votes Cast", value: d.votes.toLocaleString() },
+        { label: "Turnout", value: `${d.turnout}%` },
+        { label: "Candidates", value: d.candidates.toLocaleString() },
+        { label: "Positions", value: d.positions.toLocaleString() },
+      ]
+      const gap = 10, tileW = (pageW - 2 * M - gap * (kpis.length - 1)) / kpis.length, tileH = 56
+      kpis.forEach((k, i) => {
+        const x = M + i * (tileW + gap)
+        doc.setFillColor(248, 250, 252); doc.roundedRect(x, y, tileW, tileH, 6, 6, "F")
+        doc.setFillColor(...brand); doc.roundedRect(x, y, 4, tileH, 2, 2, "F")
+        doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(16)
+        doc.text(String(k.value), x + 12, y + 25)
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...muted)
+        doc.text(k.label.toUpperCase(), x + 12, y + 42)
+      })
+      y += tileH + 28
+
+      // helpers
+      const sectionTitle = (t: string, x: number, yy: number) => {
+        doc.setFillColor(...brand); doc.rect(x, yy - 9, 3, 12, "F")
+        doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(11)
+        doc.text(t, x + 9, yy)
+      }
+      const drawDonut = (cx: number, cy: number, r: number, segs: { value: number; color: [number, number, number] }[], inner = 0.62) => {
+        const total = segs.reduce((s, x) => s + x.value, 0) || 1
+        let a0 = -Math.PI / 2
+        const step = 0.04
+        segs.forEach((seg) => {
+          const a1 = a0 + (seg.value / total) * Math.PI * 2
+          doc.setFillColor(...seg.color)
+          for (let a = a0; a < a1 - 1e-6; a += step) {
+            const aN = Math.min(a + step, a1)
+            doc.triangle(cx, cy, cx + r * Math.cos(a), cy + r * Math.sin(a), cx + r * Math.cos(aN), cy + r * Math.sin(aN), "F")
+          }
+          a0 = a1
+        })
+        doc.setFillColor(255, 255, 255); doc.circle(cx, cy, r * inner, "F")
+      }
+      const hBars = (x: number, yy: number, w: number, rows: { label: string; value: number; color: [number, number, number] }[], unit = "") => {
+        const max = Math.max(1, ...rows.map((r) => r.value))
+        const rowH = 18, labelW = 78, barX = x + labelW, barW = w - labelW - 34
+        rows.forEach((r, i) => {
+          const ry = yy + i * rowH
+          doc.setTextColor(...ink); doc.setFont("helvetica", "normal"); doc.setFontSize(8)
+          doc.text(r.label.length > 15 ? r.label.slice(0, 14) + "…" : r.label, x, ry + 8)
+          doc.setFillColor(238, 241, 245); doc.roundedRect(barX, ry, barW, 9, 2, 2, "F")
+          const bw = Math.max(2, (r.value / max) * barW)
+          doc.setFillColor(...r.color); doc.roundedRect(barX, ry, bw, 9, 2, 2, "F")
+          doc.setTextColor(...muted); doc.setFontSize(8)
+          doc.text(`${r.value}${unit}`, barX + barW + 4, ry + 8)
+        })
+        return rows.length * rowH
+      }
+
+      // ── Row: turnout donut + category bars ──
+      const colW = (pageW - 2 * M - 24) / 2
+      const rightX = M + colW + 24
+      sectionTitle("Voter Turnout", M, y)
+      sectionTitle("Votes by Category", rightX, y)
+      const rowTop = y + 14
+      // donut
+      const pending = Math.max(0, d.voters - d.voted)
+      const donutCx = M + 52, donutCy = rowTop + 52, donutR = 42
+      drawDonut(donutCx, donutCy, donutR, [{ value: d.voted, color: [16, 185, 129] }, { value: pending, color: [226, 232, 240] }])
+      doc.setTextColor(...ink); doc.setFont("helvetica", "bold"); doc.setFontSize(15)
+      doc.text(`${d.turnout}%`, donutCx, donutCy + 2, { align: "center" })
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...muted)
+      doc.text("TURNOUT", donutCx, donutCy + 13, { align: "center" })
+      // legend
+      const legX = donutCx + donutR + 22
+      const legend = [{ c: [16, 185, 129] as [number, number, number], t: `Voted — ${d.voted.toLocaleString()}` }, { c: [203, 213, 225] as [number, number, number], t: `Pending — ${pending.toLocaleString()}` }]
+      legend.forEach((l, i) => {
+        const ly = rowTop + 34 + i * 20
+        doc.setFillColor(...l.c); doc.roundedRect(legX, ly, 10, 10, 2, 2, "F")
+        doc.setTextColor(...ink); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5)
+        doc.text(l.t, legX + 16, ly + 9)
+      })
+      // category bars
+      const catRows = (d.byCategory.length ? d.byCategory : [{ name: "No votes yet", value: 0 }]).slice(0, 6).map((c, i) => ({ label: c.name, value: c.value, color: PALETTE[i % PALETTE.length] }))
+      hBars(rightX, rowTop + 6, colW, catRows)
+      y = rowTop + Math.max(118, catRows.length * 18 + 10)
+
+      // ── Votes by position ──
+      sectionTitle("Votes by Position", M, y)
+      const posRows = [...d.posts].sort((a, b) => b.totalVotes - a.totalVotes).slice(0, 8).map((p, i) => ({ label: p.name, value: p.totalVotes, color: brand }))
+      const ph = hBars(M, y + 14, pageW - 2 * M, posRows.length ? posRows : [{ label: "No positions", value: 0, color: brand }])
+      y += 14 + ph + 22
+
+      // ── Turnout by constituency ──
+      sectionTitle("Turnout by Constituency (Year Group)", M, y)
+      const conRows = (d.constituency.length ? d.constituency : [{ year: "—", turnout: 0 }]).map((c: any, i: number) => ({ label: c.year, value: c.turnout, color: PALETTE[i % PALETTE.length] }))
+      const ch = hBars(M, y + 14, pageW - 2 * M, conRows, "%")
+      y += 14 + ch + 26
+
+      // ── Top candidates table ──
+      sectionTitle("Top Candidates", M, y)
+      autoTable(doc, {
+        head: [["#", "Candidate", "Position", "Votes", "Share"]],
+        body: d.candVotes.map((c: any, i: number) => [i + 1, c.name, c.position, c.votes, `${c.pct}%`]),
+        startY: y + 18,
+        margin: { left: M, right: M, bottom: 44 },
+        styles: { fontSize: 9, cellPadding: 5, overflow: "linebreak" },
+        headStyles: { fillColor: brand, textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [247, 249, 252] },
+        columnStyles: { 0: { cellWidth: 26, halign: "center" }, 3: { halign: "center" }, 4: { halign: "center" } },
+      })
+
+      // footer page numbers
+      const pages = doc.getNumberOfPages()
+      for (let i = 1; i <= pages; i++) {
+        doc.setPage(i)
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150)
+        doc.text(`${schoolName} · Election Dashboard`, M, pageH - 22)
+        doc.text(`Page ${i} of ${pages}`, pageW - M, pageH - 22, { align: "right" })
+      }
+
+      doc.save(`dashboard-report-${new Date().toISOString().split("T")[0]}.pdf`)
+      toast.success("Dashboard PDF report exported")
+    } catch (e) {
+      console.error("Dashboard PDF export error:", e)
+      toast.error("Failed to generate the PDF report")
+    } finally {
+      setExportingPdf(false)
+    }
   }
 
   function answer(question: string): string {
@@ -421,7 +612,8 @@ export default function AdminDashboard() {
             </Button>
           </Link>
           <Button onClick={() => setAddOpen(true)} variant="outline" size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add widget</Button>
-          <Button onClick={exportCsv} size="sm" className="gap-2 bg-sky-600 hover:bg-sky-700"><Download className="h-4 w-4" /> Export</Button>
+          <Button onClick={exportCsv} variant="outline" size="sm" className="gap-2"><Download className="h-4 w-4" /> CSV</Button>
+          <Button onClick={exportPdf} disabled={exportingPdf} size="sm" className="gap-2 bg-sky-600 hover:bg-sky-700"><Download className="h-4 w-4" /> {exportingPdf ? "Exporting…" : "Export PDF"}</Button>
         </div>
       </div>
 
