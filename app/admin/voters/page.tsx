@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { supabase, getErrorMessage, isSupabaseConfigured } from "@/lib/supabase"
+import { userDb } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { FaceCamera } from "@/components/face-camera"
 import { encodeDescriptor } from "@/lib/face-recognition"
@@ -187,13 +188,10 @@ export default function VotersPage() {
   const fetchVoters = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
-      if (error) {
-        console.error("Supabase error:", getErrorMessage(error))
-        setVoters([])
-      } else {
-        setVoters(data || [])
-      }
+      // Use the paginated userDb.getAll so the list isn't truncated at PostgREST's
+      // 1000-row cap once the roll grows past 1000 voters.
+      const data = await userDb.getAll()
+      setVoters(data)
     } catch (error) {
       console.error("Error fetching voters:", error)
       setVoters([])

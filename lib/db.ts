@@ -4,14 +4,35 @@ import type { User, Candidate, Position, Vote } from "@/lib/supabase"
 
 export type { User, Candidate, Position, Vote }
 
+// PostgREST returns at most ~1000 rows per request, so a plain .select("*")
+// silently truncates large tables (the votes table in particular). This pages
+// through every row with .range(). Rows are pulled oldest-first so that votes
+// being inserted during live polling only ever extend the final page (stable
+// pagination — no skipped or duplicated rows), then reversed to preserve the
+// previous newest-first ordering callers saw.
+const PAGE_SIZE = 1000
+async function fetchAllRows<T>(table: string): Promise<T[]> {
+  const all: T[] = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) { console.error(`fetchAllRows(${table}):`, error.message); break }
+    const batch = (data ?? []) as T[]
+    all.push(...batch)
+    if (batch.length < PAGE_SIZE) break
+  }
+  all.reverse()
+  return all
+}
+
 // ── Users ─────────────────────────────────────────────────────
 
 export const userDb = {
-  getAll: async (): Promise<User[]> => {
-    const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
-    if (error) { console.error("userDb.getAll:", error.message); return [] }
-    return data ?? []
-  },
+  getAll: async (): Promise<User[]> => fetchAllRows<User>("users"),
 
   getById: async (id: string): Promise<User | null> => {
     const { data, error } = await supabase.from("users").select("*").eq("id", id).single()
@@ -61,11 +82,7 @@ export const userDb = {
 // ── Candidates ────────────────────────────────────────────────
 
 export const candidateDb = {
-  getAll: async (): Promise<Candidate[]> => {
-    const { data, error } = await supabase.from("candidates").select("*").order("created_at", { ascending: false })
-    if (error) { console.error("candidateDb.getAll:", error.message); return [] }
-    return data ?? []
-  },
+  getAll: async (): Promise<Candidate[]> => fetchAllRows<Candidate>("candidates"),
 
   getByPosition: async (positionId: string): Promise<Candidate[]> => {
     const { data, error } = await supabase
@@ -141,11 +158,7 @@ export const positionDb = {
 // ── Votes ─────────────────────────────────────────────────────
 
 export const voteDb = {
-  getAll: async (): Promise<Vote[]> => {
-    const { data, error } = await supabase.from("votes").select("*").order("created_at", { ascending: false })
-    if (error) { console.error("voteDb.getAll:", error.message); return [] }
-    return data ?? []
-  },
+  getAll: async (): Promise<Vote[]> => fetchAllRows<Vote>("votes"),
 
   createBatch: async (votes: Omit<Vote, "id" | "created_at">[]): Promise<boolean> => {
     const { error } = await supabase.from("votes").insert(votes)
