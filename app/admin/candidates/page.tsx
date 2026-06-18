@@ -38,39 +38,85 @@ export default function CandidatesPage() {
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
-  // Resize an uploaded photo to a compact square-ish PNG data URL stored in photo_url
-  const resizeImage = (file: File, max = 400): Promise<string> =>
+  // Downscale any browser-decodable image (given as a data URL) to a compact JPEG data URL
+  const downscaleDataUrl = (src: string, max = 400): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new window.Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > height && width > max) { height = Math.round((height * max) / width); width = max }
+        else if (height > max) { width = Math.round((width * max) / height); height = max }
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return reject(new Error("no ctx"))
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", 0.85))
+      }
+      img.onerror = reject
+      img.src = src
+    })
+
+  const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => {
-        const img = new window.Image()
-        img.onload = () => {
-          let { width, height } = img
-          if (width > height && width > max) { height = Math.round((height * max) / width); width = max }
-          else if (height > max) { width = Math.round((width * max) / height); height = max }
-          const canvas = document.createElement("canvas")
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext("2d")
-          if (!ctx) return reject(new Error("no ctx"))
-          ctx.drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL("image/jpeg", 0.85))
-        }
-        img.onerror = reject
-        img.src = reader.result as string
-      }
+      reader.onload = () => resolve(reader.result as string)
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
 
+  const bytesToBase64 = (bytes: Uint8Array): string => {
+    let binary = ""
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)))
+    }
+    return btoa(binary)
+  }
+
+  // Canon CR2 (and most TIFF-based RAW files) embed full JPEG previews. Browsers can't
+  // decode the RAW itself, so we pull out the largest embedded JPEG and use that.
+  // JPEG byte-stuffing guarantees 0xFF 0xD9 only appears as a real EOI marker, so the
+  // first EOI after each SOI is the true end of that JPEG.
+  const extractEmbeddedJpeg = (buf: ArrayBuffer): string | null => {
+    const bytes = new Uint8Array(buf)
+    let best: { start: number; end: number } | null = null
+    for (let i = 0; i + 1 < bytes.length; i++) {
+      if (bytes[i] === 0xff && bytes[i + 1] === 0xd8) {
+        for (let j = i + 2; j + 1 < bytes.length; j++) {
+          if (bytes[j] === 0xff && bytes[j + 1] === 0xd9) {
+            if (!best || j + 2 - i > best.end - best.start) best = { start: i, end: j + 2 }
+            i = j + 1
+            break
+          }
+        }
+      }
+    }
+    if (!best) return null
+    return "data:image/jpeg;base64," + bytesToBase64(bytes.subarray(best.start, best.end))
+  }
+
   const handlePhoto = async (file: File | undefined, apply: (url: string) => void) => {
     if (!file) return
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please choose an image.", variant: "destructive" })
+    const isCr2 = /\.cr2$/i.test(file.name) || file.type === "image/x-canon-cr2"
+    if (!isCr2 && !file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please choose an image or a Canon CR2 file.", variant: "destructive" })
       return
     }
     try {
-      apply(await resizeImage(file))
+      let src: string
+      if (isCr2) {
+        const jpeg = extractEmbeddedJpeg(await file.arrayBuffer())
+        if (!jpeg) {
+          toast({ title: "Couldn't read CR2", description: "No embedded preview found in that file.", variant: "destructive" })
+          return
+        }
+        src = jpeg
+      } else {
+        src = await fileToDataUrl(file)
+      }
+      apply(await downscaleDataUrl(src))
     } catch {
       toast({ title: "Error", description: "Could not process that image.", variant: "destructive" })
     }
@@ -253,7 +299,7 @@ export default function CandidatesPage() {
                     </div>
                     <label className="cursor-pointer">
                       <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setNewCandidate((p) => ({ ...p, photo_url: url })))} />
+                      <input type="file" accept="image/*,.cr2,image/x-canon-cr2" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setNewCandidate((p) => ({ ...p, photo_url: url })))} />
                     </label>
                     {newCandidate.photo_url && (
                       <Button variant="ghost" size="sm" onClick={() => setNewCandidate((p) => ({ ...p, photo_url: "" }))}>Remove</Button>
@@ -450,7 +496,7 @@ export default function CandidatesPage() {
                   </div>
                   <label className="cursor-pointer">
                     <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload Photo</div>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setEditingCandidate({ ...editingCandidate, photo_url: url }))} />
+                    <input type="file" accept="image/*,.cr2,image/x-canon-cr2" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0], (url) => setEditingCandidate({ ...editingCandidate, photo_url: url }))} />
                   </label>
                   {editingCandidate.photo_url && (
                     <Button variant="ghost" size="sm" onClick={() => setEditingCandidate({ ...editingCandidate, photo_url: "" })}>Remove</Button>
