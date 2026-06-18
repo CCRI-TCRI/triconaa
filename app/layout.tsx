@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { SchoolBrandingProvider } from "@/components/school-branding-provider"
 import { EmergencyProvider } from "@/components/emergency-broadcast"
 
@@ -26,14 +27,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body>
-        <SchoolBrandingProvider>
-          <EmergencyProvider>{children}</EmergencyProvider>
-        </SchoolBrandingProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+          <SchoolBrandingProvider>
+            <EmergencyProvider>{children}</EmergencyProvider>
+          </SchoolBrandingProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

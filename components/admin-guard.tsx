@@ -14,6 +14,7 @@ const PUBLIC_ADMIN_ROUTES = [
   "/admin/headteacher/login",
   "/admin/chairperson/login",
   "/admin/live-results",
+  "/admin/broadcast",
   "/admin/reveal",
 ]
 

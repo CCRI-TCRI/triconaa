@@ -8,6 +8,7 @@ import { TutorialPopup } from "@/components/tutorial-popup"
 import { HolidayPopup } from "@/components/holiday-popup"
 import { SeasonalBackground } from "@/components/seasonal-background"
 import { AdminAccessButton } from "@/components/admin-access-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { SeasonalIntro } from "@/components/seasonal-intro"
 import { ElectionClosedScreen } from "@/components/election-closed-screen"
 import { WinnersScreen } from "@/components/winners-screen"
@@ -93,12 +94,8 @@ export default function VotingApp() {
     if (!hasSeenHolidayGreeting && season.theme !== "default") {
       setTimeout(() => setShowHolidayGreeting(true), 1000)
     }
-
-    if (season.theme === "halloween") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
+    // Note: the global `dark` class is owned by next-themes (user toggle) — the
+    // seasonal themes no longer force it on/off.
   }, [season.theme])
 
   const handleAuthSuccess = async (id: string) => {
@@ -166,6 +163,7 @@ export default function VotingApp() {
         <SeasonalBackground theme={season.theme} />
         <BiometricAuth onAuthSuccess={handleAuthSuccess} />
         <AdminAccessButton />
+        <ThemeToggle variant="icon" className="fixed right-4 top-4 z-50" />
         {showTutorial && <TutorialPopup onClose={handleTutorialClose} onComplete={handleTutorialPopupComplete} />}
         {showHolidayGreeting && <HolidayPopup onClose={handleHolidayClose} />}
       </div>

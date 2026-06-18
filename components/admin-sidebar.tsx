@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { clearAdminAuthed } from "@/components/admin-guard"
+import { ThemeToggle } from "@/components/theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +32,7 @@ import {
   School,
   Briefcase,
   Sparkles,
+  Radio,
 } from "lucide-react"
 
 const menuItems = [
@@ -81,6 +83,11 @@ const menuItems = [
         title: "Live Results",
         url: "/admin/results",
         icon: Trophy,
+      },
+      {
+        title: "Live Coverage",
+        url: "/admin/broadcast",
+        icon: Radio,
       },
       {
         title: "Reveal Show",
@@ -157,11 +164,15 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-slate-200">
+      <SidebarFooter className="border-t border-slate-200 dark:border-white/10">
+        <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Dark mode</span>
+          <ThemeToggle />
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              className="rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+              className="rounded-lg text-slate-600 hover:bg-rose-50 hover:text-rose-600 dark:text-slate-300 dark:hover:bg-rose-500/10"
               onClick={() => {
                 clearAdminAuthed()
                 window.location.href = "/"

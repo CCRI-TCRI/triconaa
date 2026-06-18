@@ -246,3 +246,105 @@ body {
     animation: none;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────
+   Site-wide dark mode.
+   Most screens were built with hard-coded light utilities
+   (bg-white, text-slate-900, …). Rather than rewrite every page,
+   we remap the common neutral/tint utilities under `.dark` so the
+   whole site shifts to a cohesive dark theme. Arbitrary colours
+   (bg-[#...]) and saturated accents (bg-blue-600, etc.) are left
+   untouched on purpose. `.dark .bg-white` (specificity 0,2,0) wins
+   over the base `.bg-white` utility without needing !important.
+   ────────────────────────────────────────────────────────────── */
+@layer utilities {
+  .dark .admin-aura {
+    background-image: linear-gradient(125deg, #0b1120, #0e1726, #0a1420, #0d1828, #0b1a16, #0b1120);
+  }
+  .dark .liquid-glass {
+    background: rgba(20, 24, 38, 0.55);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  /* Surfaces */
+  .dark .bg-white { background-color: #0f172a; }
+  .dark .bg-slate-50,
+  .dark .bg-gray-50,
+  .dark .bg-zinc-50,
+  .dark .bg-neutral-50,
+  .dark .bg-stone-50 { background-color: #0b1120; }
+  .dark .bg-slate-100,
+  .dark .bg-gray-100,
+  .dark .bg-zinc-100,
+  .dark .bg-neutral-100 { background-color: #1e293b; }
+  .dark .bg-slate-200,
+  .dark .bg-gray-200 { background-color: #334155; }
+
+  /* Light accent tints → muted dark tints */
+  .dark .bg-blue-50,
+  .dark .bg-sky-50,
+  .dark .bg-indigo-50,
+  .dark .bg-cyan-50 { background-color: #0c1a2e; }
+  .dark .bg-rose-50,
+  .dark .bg-red-50,
+  .dark .bg-pink-50 { background-color: #2a1117; }
+  .dark .bg-amber-50,
+  .dark .bg-yellow-50,
+  .dark .bg-orange-50 { background-color: #2a2410; }
+  .dark .bg-emerald-50,
+  .dark .bg-green-50,
+  .dark .bg-teal-50 { background-color: #0c2218; }
+  .dark .bg-violet-50,
+  .dark .bg-purple-50,
+  .dark .bg-fuchsia-50 { background-color: #1c1430; }
+
+  /* Text */
+  .dark .text-black,
+  .dark .text-slate-950,
+  .dark .text-slate-900,
+  .dark .text-gray-900,
+  .dark .text-zinc-900,
+  .dark .text-neutral-900,
+  .dark .text-blue-950,
+  .dark .text-blue-900 { color: #e7ecf3; }
+  .dark .text-slate-800,
+  .dark .text-gray-800,
+  .dark .text-zinc-800,
+  .dark .text-slate-700,
+  .dark .text-gray-700,
+  .dark .text-zinc-700 { color: #cbd5e1; }
+  .dark .text-slate-600,
+  .dark .text-gray-600,
+  .dark .text-zinc-600,
+  .dark .text-slate-500,
+  .dark .text-gray-500,
+  .dark .text-zinc-500 { color: #94a3b8; }
+  .dark .text-slate-400,
+  .dark .text-gray-400 { color: #6b7a90; }
+
+  /* Borders */
+  .dark .border-white,
+  .dark .border-slate-100,
+  .dark .border-slate-200,
+  .dark .border-gray-100,
+  .dark .border-gray-200,
+  .dark .border-zinc-200,
+  .dark .border-neutral-200,
+  .dark .border-blue-100,
+  .dark .border-blue-50,
+  .dark .border-rose-100,
+  .dark .border-emerald-100,
+  .dark .border-amber-100 { border-color: rgba(255, 255, 255, 0.1); }
+
+  /* Dividers */
+  .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255, 255, 255, 0.08); }
+}
+
+/* The plain dark studio background for the global app shell */
+.dark body {
+  background-color: #0b1120;
+}
