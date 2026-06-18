@@ -789,117 +789,186 @@ export default function VotersPage() {
     }
   }
 
+  // Build one designed voters PDF (logo header + table) for a given list. Shared by the
+  // combined export and the per-class export so both look identical.
+  const makeVotersDoc = (
+    jsPDFCtor: any,
+    autoTable: any,
+    list: Voter[],
+    reportTitle: string,
+    logo: { data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null,
+    maroon: [number, number, number],
+    gold: [number, number, number],
+  ) => {
+    const doc = new jsPDFCtor({ orientation: "portrait", unit: "pt", format: "a4" })
+    const pageW = doc.internal.pageSize.getWidth()
+    const pageH = doc.internal.pageSize.getHeight()
+    const headerH = 92
+    const generatedAt = new Date().toLocaleString()
+
+    const drawHeader = () => {
+      doc.setFillColor(...maroon)
+      doc.rect(0, 0, pageW, headerH, "F")
+      doc.setFillColor(...gold)
+      doc.rect(0, headerH, pageW, 3, "F")
+
+      let textX = 40
+      if (logo) {
+        const box = 58
+        const cx = 40 + box / 2
+        const cy = headerH / 2
+        doc.setFillColor(255, 255, 255)
+        doc.circle(cx, cy, box / 2 + 3, "F")
+        const ratio = logo.w / logo.h
+        let w = box
+        let h = box
+        if (ratio > 1) h = box / ratio
+        else w = box * ratio
+        doc.addImage(logo.data, logo.fmt, cx - w / 2, cy - h / 2, w, h)
+        textX = 40 + box + 16
+      }
+
+      doc.setTextColor(255, 255, 255)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(15)
+      doc.text(schoolName.toUpperCase(), textX, 34)
+      doc.setFont("helvetica", "italic")
+      doc.setFontSize(9)
+      doc.setTextColor(...gold)
+      doc.text(`"${motto}"`, textX, 50)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(11)
+      doc.setTextColor(255, 255, 255)
+      doc.text(reportTitle, textX, 70)
+
+      doc.setFontSize(8)
+      doc.setTextColor(255, 230, 230)
+      doc.text(`Generated: ${generatedAt}`, pageW - 40, 30, { align: "right" })
+      doc.text(`Total voters: ${list.length}`, pageW - 40, 44, { align: "right" })
+      doc.text(`Voted: ${list.filter((v) => v.has_voted).length}`, pageW - 40, 58, { align: "right" })
+    }
+
+    const drawFooter = (page: number, total: number) => {
+      doc.setFontSize(8)
+      doc.setTextColor(150, 150, 150)
+      doc.text(`${schoolName} · Royal Ballot Election System`, 40, pageH - 24)
+      doc.text(`Page ${page} of ${total}`, pageW - 40, pageH - 24, { align: "right" })
+    }
+
+    autoTable(doc, {
+      head: [["#", "Student ID", "Full Name", "Class", "Voting Code", "Status"]],
+      body: list.map((v, i) => [
+        i + 1,
+        v.student_id,
+        v.full_name,
+        v.class,
+        v.voting_code,
+        v.has_voted ? "Voted" : "Pending",
+      ]),
+      startY: headerH + 18,
+      margin: { top: headerH + 18, left: 40, right: 40, bottom: 40 },
+      styles: { fontSize: 9, cellPadding: 5, overflow: "linebreak" },
+      headStyles: { fillColor: maroon, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [251, 240, 233] },
+      columnStyles: {
+        0: { cellWidth: 28, halign: "center" },
+        1: { cellWidth: 80 },
+        3: { cellWidth: 50, halign: "center" },
+        4: { font: "courier", fontStyle: "bold", textColor: maroon },
+        5: { cellWidth: 60, halign: "center" },
+      },
+      didParseCell: (data: any) => {
+        if (data.section === "body" && data.column.index === 5) {
+          data.cell.styles.textColor = data.cell.raw === "Voted" ? [22, 130, 70] : [180, 120, 0]
+        }
+      },
+    })
+
+    const pageCount = (doc as any).getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      drawHeader()
+      drawFooter(i, pageCount)
+    }
+    return doc
+  }
+
+  // Shared logo + brand-colour loading for the PDF exports.
+  const loadPdfBrand = async (): Promise<{
+    logo: { data: string; fmt: "PNG" | "JPEG"; w: number; h: number } | null
+    maroon: [number, number, number]
+    gold: [number, number, number]
+  }> => {
+    const logo = await loadLogo()
+    const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
+    const gold: [number, number, number] = [245, 200, 66]
+    return { logo, maroon, gold }
+  }
+
   const exportVotersPDF = async () => {
     setExportingPdf(true)
     try {
       const { jsPDF } = await import("jspdf")
       const autoTable = (await import("jspdf-autotable")).default
-
-      const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" })
-      const pageW = doc.internal.pageSize.getWidth()
-      const pageH = doc.internal.pageSize.getHeight()
-
-      const logo = await loadLogo()
-      const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
-      const gold: [number, number, number] = [245, 200, 66]
-      const headerH = 92
-      const generatedAt = new Date().toLocaleString()
-      const list = filteredVoters
-
-      const drawHeader = () => {
-        // maroon band
-        doc.setFillColor(...maroon)
-        doc.rect(0, 0, pageW, headerH, "F")
-        // gold underline
-        doc.setFillColor(...gold)
-        doc.rect(0, headerH, pageW, 3, "F")
-
-        let textX = 40
-        if (logo) {
-          // white circle behind logo
-          const box = 58
-          const cx = 40 + box / 2
-          const cy = headerH / 2
-          doc.setFillColor(255, 255, 255)
-          doc.circle(cx, cy, box / 2 + 3, "F")
-          const ratio = logo.w / logo.h
-          let w = box
-          let h = box
-          if (ratio > 1) h = box / ratio
-          else w = box * ratio
-          doc.addImage(logo.data, logo.fmt, cx - w / 2, cy - h / 2, w, h)
-          textX = 40 + box + 16
-        }
-
-        doc.setTextColor(255, 255, 255)
-        doc.setFont("helvetica", "bold")
-        doc.setFontSize(15)
-        doc.text(schoolName.toUpperCase(), textX, 34)
-        doc.setFont("helvetica", "italic")
-        doc.setFontSize(9)
-        doc.setTextColor(...gold)
-        doc.text(`"${motto}"`, textX, 50)
-        doc.setFont("helvetica", "normal")
-        doc.setFontSize(11)
-        doc.setTextColor(255, 255, 255)
-        doc.text("Registered Voters Report", textX, 70)
-
-        // right meta
-        doc.setFontSize(8)
-        doc.setTextColor(255, 230, 230)
-        doc.text(`Generated: ${generatedAt}`, pageW - 40, 30, { align: "right" })
-        doc.text(`Total voters: ${list.length}`, pageW - 40, 44, { align: "right" })
-        doc.text(`Voted: ${list.filter((v) => v.has_voted).length}`, pageW - 40, 58, { align: "right" })
-      }
-
-      const drawFooter = (page: number, total: number) => {
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(`${schoolName} · Royal Ballot Election System`, 40, pageH - 24)
-        doc.text(`Page ${page} of ${total}`, pageW - 40, pageH - 24, { align: "right" })
-      }
-
-      autoTable(doc, {
-        head: [["#", "Student ID", "Full Name", "Class", "Voting Code", "Status"]],
-        body: list.map((v, i) => [
-          i + 1,
-          v.student_id,
-          v.full_name,
-          v.class,
-          v.voting_code,
-          v.has_voted ? "Voted" : "Pending",
-        ]),
-        startY: headerH + 18,
-        margin: { top: headerH + 18, left: 40, right: 40, bottom: 40 },
-        styles: { fontSize: 9, cellPadding: 5, overflow: "linebreak" },
-        headStyles: { fillColor: maroon, textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [251, 240, 233] },
-        columnStyles: {
-          0: { cellWidth: 28, halign: "center" },
-          1: { cellWidth: 80 },
-          3: { cellWidth: 50, halign: "center" },
-          4: { font: "courier", fontStyle: "bold", textColor: maroon },
-          5: { cellWidth: 60, halign: "center" },
-        },
-        didParseCell: (data) => {
-          if (data.section === "body" && data.column.index === 5) {
-            data.cell.styles.textColor = data.cell.raw === "Voted" ? [22, 130, 70] : [180, 120, 0]
-          }
-        },
-      })
-
-      const pageCount = (doc as any).getNumberOfPages()
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i)
-        drawHeader()
-        drawFooter(i, pageCount)
-      }
-
+      const { logo, maroon, gold } = await loadPdfBrand()
+      const doc = makeVotersDoc(jsPDF, autoTable, filteredVoters, "Registered Voters Report", logo, maroon, gold)
       doc.save(`st-theresa-voters-${new Date().toISOString().split("T")[0]}.pdf`)
-      toast({ title: "PDF ready", description: `Exported ${list.length} voters as PDF.` })
+      toast({ title: "PDF ready", description: `Exported ${filteredVoters.length} voters as PDF.` })
     } catch (error) {
       console.error("Error exporting PDF:", error)
       toast({ title: "Error", description: "Failed to generate PDF.", variant: "destructive" })
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  // Export one PDF per class (of the currently filtered voters), bundled into a single ZIP.
+  const exportVotersByClassPDF = async () => {
+    setExportingPdf(true)
+    try {
+      const list = filteredVoters
+      if (list.length === 0) {
+        toast({ title: "Nothing to export", description: "No voters match the current filters.", variant: "destructive" })
+        return
+      }
+
+      const { jsPDF } = await import("jspdf")
+      const autoTable = (await import("jspdf-autotable")).default
+      const JSZip = (await import("jszip")).default
+      const { logo, maroon, gold } = await loadPdfBrand()
+
+      // Group by class, keeping each class's voters together.
+      const groups = new Map<string, Voter[]>()
+      for (const v of list) {
+        const key = (v.class || "").trim() || "Unassigned"
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key)!.push(v)
+      }
+      const classNames = [...groups.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+      const zip = new JSZip()
+      for (const cls of classNames) {
+        const doc = makeVotersDoc(jsPDF, autoTable, groups.get(cls)!, `Voting Codes — Class ${cls}`, logo, maroon, gold)
+        const safe = cls.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "class"
+        zip.file(`${safe}-voting-codes.pdf`, doc.output("blob"))
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" })
+      const url = URL.createObjectURL(zipBlob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `voting-codes-by-class-${new Date().toISOString().split("T")[0]}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast({
+        title: "Class PDFs ready",
+        description: `Exported ${classNames.length} class${classNames.length === 1 ? "" : "es"} as separate PDFs in a ZIP.`,
+      })
+    } catch (error) {
+      console.error("Error exporting per-class PDFs:", error)
+      toast({ title: "Error", description: "Failed to generate per-class PDFs.", variant: "destructive" })
     } finally {
       setExportingPdf(false)
     }
@@ -1009,6 +1078,16 @@ export default function VotersPage() {
           >
             {exportingPdf ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
             Export PDF
+          </Button>
+          <Button
+            onClick={exportVotersByClassPDF}
+            variant="outline"
+            disabled={saving || exportingPdf || voters.length === 0}
+            className="border-rose-300 text-rose-800 hover:bg-rose-50"
+            title="One PDF per class, bundled into a ZIP"
+          >
+            {exportingPdf ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+            PDF per Class
           </Button>
           <Dialog
             open={showImportDialog}
