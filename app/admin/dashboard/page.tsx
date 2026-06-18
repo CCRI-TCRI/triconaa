@@ -415,6 +415,11 @@ export default function AdminDashboard() {
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-slate-400" />
           </div>
+          <Link href="/admin/reveal">
+            <Button size="sm" className="gap-2 bg-gradient-to-r from-amber-500 via-rose-600 to-rose-700 font-semibold text-white shadow-md transition-all hover:from-amber-600 hover:via-rose-700 hover:to-rose-800 hover:shadow-lg">
+              <Sparkles className="h-4 w-4" /> Live Results Show
+            </Button>
+          </Link>
           <Button onClick={() => setAddOpen(true)} variant="outline" size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add widget</Button>
           <Button onClick={exportCsv} size="sm" className="gap-2 bg-sky-600 hover:bg-sky-700"><Download className="h-4 w-4" /> Export</Button>
         </div>
