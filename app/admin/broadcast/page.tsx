@@ -89,7 +89,8 @@ export default function BroadcastPage() {
         voteDb.getAll(),
         userDb.getAll(),
       ])
-      setCompleted(status === "completed")
+      // A stopped or completed election is final — leaders become winners.
+      setCompleted(status === "completed" || status === "stopped")
       const data: Race[] = positions.map((p) => {
         const pv = votes.filter((v) => v.position_id === p.id)
         const candidates: Cand[] = p.candidates
