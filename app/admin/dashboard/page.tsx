@@ -607,7 +607,11 @@ export default function AdminDashboard() {
             <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-slate-400" />
           </div>
           <Link href="/admin/broadcast">
-            <Button size="sm" className="gap-2 bg-blue-600 font-semibold text-white hover:bg-blue-700">
+            <Button
+              size="sm"
+              className="gap-2 bg-blue-600 font-semibold text-white hover:bg-blue-700"
+              onClick={() => { try { document.documentElement.requestFullscreen?.() } catch { /* ignore */ } }}
+            >
               <Sparkles className="h-4 w-4" /> Live Coverage
             </Button>
           </Link>

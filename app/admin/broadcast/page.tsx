@@ -6,7 +6,7 @@ import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/l
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
-import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, Users, BarChart3 } from "lucide-react"
+import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize } from "lucide-react"
 
 // ── Broadcast palette (election-night studio) ──────────────────
 const RED = "#e11d2a"
@@ -62,6 +62,23 @@ export default function BroadcastPage() {
   const [clock, setClock] = useState("")
   const [loading, setLoading] = useState(true)
   const [paused, setPaused] = useState(false)
+  const [isFs, setIsFs] = useState(false)
+
+  const toggleFullscreen = useCallback(() => {
+    if (typeof document === "undefined") return
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+  }, [])
+
+  // Auto-enter fullscreen on open (works when navigation came from a click gesture,
+  // e.g. the dashboard "Live Coverage" button), and track fullscreen state.
+  useEffect(() => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
+    const onChange = () => setIsFs(!!document.fullscreenElement)
+    onChange()
+    document.addEventListener("fullscreenchange", onChange)
+    return () => document.removeEventListener("fullscreenchange", onChange)
+  }, [])
 
   // ── live data ────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -134,10 +151,11 @@ export default function BroadcastPage() {
       if (e.code === "ArrowRight") go(1)
       else if (e.code === "ArrowLeft") go(-1)
       else if (e.code === "Space") { e.preventDefault(); setPaused((p) => !p) }
+      else if (e.key === "f" || e.key === "F") toggleFullscreen()
     }
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
-  }, [go])
+  }, [go, toggleFullscreen])
 
   if (lockdown) return <LockdownScreen />
 
@@ -317,6 +335,9 @@ export default function BroadcastPage() {
             {paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
           </button>
           <button onClick={() => go(1)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Next"><ChevronRight className="h-5 w-5" /></button>
+          <button onClick={toggleFullscreen} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={isFs ? "Exit fullscreen" : "Fullscreen"}>
+            {isFs ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          </button>
         </div>
         <div className="hidden flex-1 items-center justify-center gap-1.5 sm:flex">
           {races.map((_, i) => (
