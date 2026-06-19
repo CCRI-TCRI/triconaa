@@ -18,7 +18,7 @@ import {
   ScrollText,
   ShieldCheck,
 } from "lucide-react"
-import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
+import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
 import type { Position, Candidate } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { toast } from "sonner"
@@ -190,19 +190,23 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const fetchElectionData = async () => {
     setIsLoading(true)
     try {
-      const positionsWithCandidates = await getPositionsWithCandidates()
+      const [{ includeUnopposed }, positionsWithCandidates] = await Promise.all([
+        electionControl.get(),
+        getPositionsWithCandidates(),
+      ])
       const withCandidates = positionsWithCandidates.filter((p) => p.candidates && p.candidates.length > 0)
-      // A position with a single candidate is uncontested — that candidate is elected
-      // unopposed, so it is never put on the ballot for voting.
-      const votable = withCandidates.filter((p) => p.candidates.length >= 2)
-      const unopposed = withCandidates.filter((p) => p.candidates.length === 1)
+      // A position with a single candidate is uncontested. By default that candidate is
+      // elected unopposed and kept off the ballot — unless the admin has chosen to
+      // include unopposed positions on the ballot.
+      const votable = includeUnopposed ? withCandidates : withCandidates.filter((p) => p.candidates.length >= 2)
+      const unopposed = includeUnopposed ? [] : withCandidates.filter((p) => p.candidates.length === 1)
       setUnopposedPositions(unopposed)
       setPositions(votable)
       if (votable.length === 0) {
         if (unopposed.length === 0) toast.error("No candidates available for voting at this time.")
         return
       }
-      toast.success(`Loaded ${votable.length} contested position${votable.length === 1 ? "" : "s"} for voting`)
+      toast.success(`Loaded ${votable.length} position${votable.length === 1 ? "" : "s"} for voting`)
     } catch (error) {
       console.error("Error fetching election data:", error)
       toast.error("Failed to load election data. Please try again.")

@@ -215,15 +215,16 @@ export async function getPositionsWithCandidates(): Promise<Array<Position & { c
 export type ElectionStatus = "active" | "paused" | "stopped" | "completed"
 
 export const electionControl = {
-  get: async (): Promise<{ status: ElectionStatus; term: string }> => {
+  get: async (): Promise<{ status: ElectionStatus; term: string; includeUnopposed: boolean }> => {
     const { data } = await supabase
       .from("election_settings")
-      .select("election_status, election_term")
+      .select("election_status, election_term, include_unopposed")
       .limit(1)
       .single()
     return {
       status: (data?.election_status as ElectionStatus) || "active",
       term: data?.election_term || "2027 democratic term",
+      includeUnopposed: !!data?.include_unopposed,
     }
   },
 
@@ -232,6 +233,15 @@ export const electionControl = {
     if (!row) return false
     const { error } = await supabase.from("election_settings").update({ election_status: status }).eq("id", row.id)
     if (error) { console.error("electionControl.setStatus:", error.message); return false }
+    return true
+  },
+
+  // Whether single-candidate (unopposed) positions appear on the ballot.
+  setIncludeUnopposed: async (on: boolean): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ include_unopposed: on }).eq("id", row.id)
+    if (error) { console.error("electionControl.setIncludeUnopposed:", error.message); return false }
     return true
   },
 }

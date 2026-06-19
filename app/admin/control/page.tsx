@@ -21,6 +21,7 @@ import Link from "next/link"
 import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles, ShieldAlert, Lock, Megaphone, Volume2, Timer } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { userDb, voteDb, electionControl, broadcastDb, type ElectionStatus } from "@/lib/db"
 import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
 
@@ -40,6 +41,7 @@ export default function ControlSystemPage() {
   const [lockdown, setLockdown] = useState(false)
   const [code5Interval, setCode5Interval] = useState(0)
   const [code5Input, setCode5Input] = useState("0")
+  const [includeUnopposed, setIncludeUnopposed] = useState(false)
 
   useEffect(() => {
     refresh()
@@ -55,13 +57,20 @@ export default function ControlSystemPage() {
   }, [code5Interval])
 
   const refresh = async () => {
-    const [{ status, term }, b] = await Promise.all([electionControl.get(), broadcastDb.get()])
+    const [{ status, term, includeUnopposed }, b] = await Promise.all([electionControl.get(), broadcastDb.get()])
     setStatus(status)
     setTerm(term)
+    setIncludeUnopposed(includeUnopposed)
     setLockdown(b.lockdown)
     setCode5Interval(b.code5Interval)
     setCode5Input(String(b.code5Interval))
     loadStats()
+  }
+
+  const toggleIncludeUnopposed = async (on: boolean) => {
+    setIncludeUnopposed(on)
+    const ok = await electionControl.setIncludeUnopposed(on)
+    if (!ok) setIncludeUnopposed(!on) // revert on failure
   }
 
   const loadStats = async () => {
@@ -249,6 +258,26 @@ export default function ControlSystemPage() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Ballot options */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Vote className="h-5 w-5" />Ballot Options</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+            <div className="min-w-0">
+              <p className="font-medium">Include unopposed positions on the ballot</p>
+              <p className="text-sm text-muted-foreground">
+                {includeUnopposed
+                  ? "On — positions with a single candidate appear on the ballot and students vote on them."
+                  : "Off — positions with a single candidate are kept off the ballot; the candidate is shown as elected unopposed."}
+              </p>
+            </div>
+            <Switch checked={includeUnopposed} onCheckedChange={toggleIncludeUnopposed} aria-label="Include unopposed positions on the ballot" />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Emergency / voice-code broadcast */}
       <Card>
