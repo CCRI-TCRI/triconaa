@@ -5,8 +5,11 @@ import { usePathname, useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { ShieldX, ArrowLeft } from "lucide-react"
 import { useSchoolBranding } from "@/components/school-branding-provider"
+import type { AdminRole } from "@/lib/db"
 
 export const ADMIN_AUTH_KEY = "tricona_admin_authed"
+export const ADMIN_ROLE_KEY = "tricona_admin_role"
+export const ADMIN_NAME_KEY = "tricona_admin_name"
 
 // Login pages + the public assembly/broadcast screens (shown on projectors and
 // watched on phones via QR) stay reachable without being signed in.
@@ -18,17 +21,78 @@ const PUBLIC_ADMIN_ROUTES = [
   "/admin/reveal",
 ]
 
-export function setAdminAuthed() {
+// Where each role lands after login, and which route prefixes they may access.
+export const ROLE_HOME: Record<AdminRole, string> = {
+  admin: "/admin/dashboard",
+  chairperson: "/admin/candidates",
+  headteacher: "/admin/dashboard",
+}
+
+const ROLE_ROUTES: Record<AdminRole, string[]> = {
+  // Administrator: full access to everything under /admin.
+  admin: ["/admin"],
+  // Electoral commission chairperson: manages candidates & positions, views results.
+  chairperson: [
+    "/admin/candidates",
+    "/admin/positions",
+    "/admin/results",
+    "/admin/analytics",
+    "/admin/live-results",
+    "/admin/broadcast",
+    "/admin/reveal",
+  ],
+  // Head teacher: read-only — results, analytics, reports, live coverage.
+  headteacher: [
+    "/admin/dashboard",
+    "/admin/results",
+    "/admin/analytics",
+    "/admin/reports",
+    "/admin/live-results",
+    "/admin/broadcast",
+    "/admin/reveal",
+  ],
+}
+
+export function roleCanAccess(role: AdminRole, pathname: string): boolean {
+  return ROLE_ROUTES[role].some((p) => pathname === p || pathname.startsWith(p + "/") || pathname.startsWith(p))
+}
+
+export function setAdminSession(role: AdminRole, name: string) {
   try {
     localStorage.setItem(ADMIN_AUTH_KEY, "1")
+    localStorage.setItem(ADMIN_ROLE_KEY, role)
+    localStorage.setItem(ADMIN_NAME_KEY, name)
   } catch {
     /* ignore */
+  }
+}
+
+// Back-compat: older callers set just the authed flag (treated as admin).
+export function setAdminAuthed() {
+  setAdminSession("admin", "Administrator")
+}
+
+export function getAdminRole(): AdminRole | null {
+  try {
+    return (localStorage.getItem(ADMIN_ROLE_KEY) as AdminRole) || null
+  } catch {
+    return null
+  }
+}
+
+export function getAdminName(): string {
+  try {
+    return localStorage.getItem(ADMIN_NAME_KEY) || ""
+  } catch {
+    return ""
   }
 }
 
 export function clearAdminAuthed() {
   try {
     localStorage.removeItem(ADMIN_AUTH_KEY)
+    localStorage.removeItem(ADMIN_ROLE_KEY)
+    localStorage.removeItem(ADMIN_NAME_KEY)
   } catch {
     /* ignore */
   }
@@ -104,18 +168,29 @@ function AccessDenied() {
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [state, setState] = useState<"checking" | "ok" | "denied">("checking")
 
   useEffect(() => {
-    if (PUBLIC_ADMIN_ROUTES.some((r) => pathname?.startsWith(r))) {
+    if (!pathname) return
+    if (PUBLIC_ADMIN_ROUTES.some((r) => pathname.startsWith(r))) {
       setState("ok")
       return
     }
     const authed = typeof window !== "undefined" && localStorage.getItem(ADMIN_AUTH_KEY) === "1"
-    setState(authed ? "ok" : "denied")
-  }, [pathname])
+    if (!authed) { setState("denied"); return }
 
-  if (state === "checking") return <div className="min-h-screen bg-slate-100" />
+    const role = getAdminRole() || "admin"
+    if (roleCanAccess(role, pathname)) {
+      setState("ok")
+    } else {
+      // Signed in, but this area is outside their role — send them to their home.
+      setState("checking")
+      router.replace(ROLE_HOME[role])
+    }
+  }, [pathname, router])
+
+  if (state === "checking") return <div className="min-h-screen bg-slate-100 dark:bg-slate-950" />
   if (state === "denied") return <AccessDenied />
   return <>{children}</>
 }

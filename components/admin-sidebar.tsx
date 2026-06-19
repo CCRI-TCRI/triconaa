@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useSchoolBranding } from "@/components/school-branding-provider"
-import { clearAdminAuthed } from "@/components/admin-guard"
+import { clearAdminAuthed, getAdminRole, getAdminName, roleCanAccess } from "@/components/admin-guard"
+import type { AdminRole } from "@/lib/db"
 import { ThemeToggle } from "@/components/theme-toggle"
 import {
   Sidebar,
@@ -33,6 +35,8 @@ import {
   Briefcase,
   Sparkles,
   Radio,
+  KeyRound,
+  UserCog,
 } from "lucide-react"
 
 const menuItems = [
@@ -68,6 +72,11 @@ const menuItems = [
         title: "Candidates",
         url: "/admin/candidates",
         icon: UserCheck,
+      },
+      {
+        title: "Voting Codes",
+        url: "/admin/anon-codes",
+        icon: KeyRound,
       },
       {
         title: "Votes",
@@ -110,6 +119,11 @@ const menuItems = [
     title: "System",
     items: [
       {
+        title: "Accounts",
+        url: "/admin/accounts",
+        icon: UserCog,
+      },
+      {
         title: "Settings",
         url: "/admin/settings",
         icon: Settings,
@@ -118,26 +132,44 @@ const menuItems = [
   },
 ]
 
+const ROLE_LABEL: Record<string, string> = {
+  admin: "Administrator",
+  chairperson: "Electoral Commission",
+  headteacher: "Head Teacher",
+}
+
 export function AdminSidebar() {
   const pathname = usePathname()
   const { schoolName, logoUrl } = useSchoolBranding()
+  const [role, setRole] = useState<AdminRole | null>(null)
+  const [name, setName] = useState("")
+
+  useEffect(() => {
+    setRole(getAdminRole())
+    setName(getAdminName())
+  }, [])
+
+  // Only show menu items the signed-in role may access.
+  const groups = menuItems
+    .map((g) => ({ ...g, items: g.items.filter((it) => !role || roleCanAccess(role, it.url)) }))
+    .filter((g) => g.items.length > 0)
 
   return (
-    <Sidebar className="[&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-slate-200 [&_[data-sidebar=sidebar]]:bg-white [&_[data-sidebar=sidebar]]:text-slate-600">
-      <SidebarHeader className="border-b border-slate-200">
+    <Sidebar className="[&_[data-sidebar=sidebar]]:border-r [&_[data-sidebar=sidebar]]:border-slate-200 [&_[data-sidebar=sidebar]]:bg-white [&_[data-sidebar=sidebar]]:text-slate-600 dark:[&_[data-sidebar=sidebar]]:border-white/10 dark:[&_[data-sidebar=sidebar]]:bg-slate-900 dark:[&_[data-sidebar=sidebar]]:text-slate-300">
+      <SidebarHeader className="border-b border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sky-50 ring-1 ring-sky-100">
             <img src={logoUrl} alt={schoolName} className="h-7 w-7 object-contain" />
           </div>
           <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-slate-800">{schoolName}</h2>
-            <p className="text-[11px] text-slate-400">Administration</p>
+            <h2 className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{schoolName}</h2>
+            <p className="text-[11px] text-slate-400">{role ? ROLE_LABEL[role] : "Administration"}</p>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
-        {menuItems.map((group) => (
+        {groups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
               {group.title}
@@ -169,6 +201,11 @@ export function AdminSidebar() {
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Dark mode</span>
           <ThemeToggle />
         </div>
+        {name && (
+          <div className="px-2 pb-1 text-[11px] text-slate-400 dark:text-slate-500">
+            Signed in as <span className="font-semibold text-slate-600 dark:text-slate-300">{name}</span>
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton

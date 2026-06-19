@@ -215,16 +215,26 @@ export async function getPositionsWithCandidates(): Promise<Array<Position & { c
 export type ElectionStatus = "active" | "paused" | "stopped" | "completed"
 
 export const electionControl = {
-  get: async (): Promise<{ status: ElectionStatus; term: string; includeUnopposed: boolean }> => {
-    const { data } = await supabase
+  get: async (): Promise<{ status: ElectionStatus; term: string; includeUnopposed: boolean; anonCodesEnabled: boolean }> => {
+    // Resilient to optional columns not existing yet (e.g. before a migration is
+    // applied): fall back to the core columns so status/term always read correctly.
+    let data: any = null
+    const full = await supabase
       .from("election_settings")
-      .select("election_status, election_term, include_unopposed")
+      .select("election_status, election_term, include_unopposed, anon_codes_enabled")
       .limit(1)
       .single()
+    if (!full.error) {
+      data = full.data
+    } else {
+      const core = await supabase.from("election_settings").select("election_status, election_term").limit(1).single()
+      data = core.data
+    }
     return {
       status: (data?.election_status as ElectionStatus) || "active",
       term: data?.election_term || "2027 democratic term",
       includeUnopposed: !!data?.include_unopposed,
+      anonCodesEnabled: !!data?.anon_codes_enabled,
     }
   },
 
@@ -242,6 +252,15 @@ export const electionControl = {
     if (!row) return false
     const { error } = await supabase.from("election_settings").update({ include_unopposed: on }).eq("id", row.id)
     if (error) { console.error("electionControl.setIncludeUnopposed:", error.message); return false }
+    return true
+  },
+
+  // Whether the anonymous voting-codes feature is enabled.
+  setAnonCodesEnabled: async (on: boolean): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ anon_codes_enabled: on }).eq("id", row.id)
+    if (error) { console.error("electionControl.setAnonCodesEnabled:", error.message); return false }
     return true
   },
 }
@@ -302,4 +321,112 @@ export const broadcastDb = {
     if (error) { console.error("broadcastDb.setCode5Interval:", error.message); return false }
     return true
   },
+}
+
+// ── Admin accounts & roles ────────────────────────────────────
+
+export type AdminRole = "admin" | "chairperson" | "headteacher"
+
+export interface AdminAccount {
+  id: string
+  username: string
+  role: AdminRole
+  full_name: string | null
+  created_at?: string
+}
+
+export const accountDb = {
+  // Validate a login. Returns the account (without password) or null.
+  authenticate: async (username: string, password: string): Promise<AdminAccount | null> => {
+    const uname = username.trim()
+    const { data, error } = await supabase
+      .from("admin_accounts")
+      .select("id, username, role, full_name, password")
+      .eq("username", uname)
+      .limit(1)
+      .maybeSingle()
+    if (!error && data && data.password === password) {
+      return { id: data.id, username: data.username, role: data.role as AdminRole, full_name: data.full_name }
+    }
+    // Built-in administrator fallback — guarantees the admin is never locked out,
+    // and covers the window before the admin_accounts table is provisioned.
+    if (uname === "admin" && password === "Lavender") {
+      return { id: "builtin-admin", username: "admin", role: "admin", full_name: "Administrator" }
+    }
+    return null
+  },
+
+  list: async (): Promise<AdminAccount[]> => {
+    const { data, error } = await supabase
+      .from("admin_accounts")
+      .select("id, username, role, full_name, created_at")
+      .order("created_at", { ascending: true })
+    if (error) { console.error("accountDb.list:", error.message); return [] }
+    return (data ?? []) as AdminAccount[]
+  },
+
+  create: async (account: { username: string; password: string; role: AdminRole; full_name?: string }): Promise<AdminAccount | null> => {
+    const { data, error } = await supabase
+      .from("admin_accounts")
+      .insert([{ username: account.username.trim(), password: account.password, role: account.role, full_name: account.full_name?.trim() || null }])
+      .select("id, username, role, full_name, created_at")
+      .single()
+    if (error) { console.error("accountDb.create:", error.message); return null }
+    return data as AdminAccount
+  },
+
+  update: async (id: string, updates: { password?: string; role?: AdminRole; full_name?: string }): Promise<boolean> => {
+    const patch: Record<string, unknown> = {}
+    if (updates.password) patch.password = updates.password
+    if (updates.role) patch.role = updates.role
+    if (updates.full_name !== undefined) patch.full_name = updates.full_name?.trim() || null
+    if (Object.keys(patch).length === 0) return true
+    const { error } = await supabase.from("admin_accounts").update(patch).eq("id", id)
+    if (error) { console.error("accountDb.update:", error.message); return false }
+    return true
+  },
+
+  remove: async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from("admin_accounts").delete().eq("id", id)
+    if (error) { console.error("accountDb.remove:", error.message); return false }
+    return true
+  },
+}
+
+// ── Anonymous voting codes ────────────────────────────────────
+// Creates voter rows that aren't tied to a real student — the code itself is the
+// identity. Still backed by users rows so has_voted / vote integrity work normally.
+
+const randomCode = () => "VT" + Math.random().toString(36).substring(2, 8).toUpperCase()
+
+export async function createAnonymousVoters(count: number, prefix = "Voter"): Promise<{ student_id: string; voting_code: string; full_name: string }[]> {
+  const n = Math.min(1000, Math.max(1, Math.floor(count)))
+  // Avoid colliding with existing codes
+  const existing = await fetchAllRows<User>("users")
+  const usedCodes = new Set(existing.map((u) => u.voting_code))
+  const usedIds = new Set(existing.map((u) => u.student_id))
+  const stamp = Date.now().toString(36).toUpperCase().slice(-4)
+
+  const rows: { student_id: string; full_name: string; class: string; voting_code: string; has_voted: boolean; is_anonymous: boolean; created_at: string }[] = []
+  for (let i = 0; i < n; i++) {
+    let code = randomCode()
+    while (usedCodes.has(code)) code = randomCode()
+    usedCodes.add(code)
+    let sid = `ANON-${stamp}-${String(i + 1).padStart(4, "0")}`
+    while (usedIds.has(sid)) sid = `ANON-${stamp}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    usedIds.add(sid)
+    rows.push({
+      student_id: sid,
+      full_name: `${prefix} ${i + 1}`,
+      class: "—",
+      voting_code: code,
+      has_voted: false,
+      is_anonymous: true,
+      created_at: new Date().toISOString(),
+    })
+  }
+
+  const { error } = await supabase.from("users").insert(rows)
+  if (error) { console.error("createAnonymousVoters:", error.message); throw new Error(error.message) }
+  return rows.map((r) => ({ student_id: r.student_id, voting_code: r.voting_code, full_name: r.full_name }))
 }

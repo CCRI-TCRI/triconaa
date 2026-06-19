@@ -5,10 +5,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { useSchoolBranding } from "@/components/school-branding-provider"
-import { setAdminAuthed } from "@/components/admin-guard"
-
-const ADMIN_USERNAME = "admin"
-const ADMIN_PASSWORD = "Lavender"
+import { setAdminSession, ROLE_HOME } from "@/components/admin-guard"
+import { accountDb } from "@/lib/db"
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -23,12 +21,17 @@ export default function AdminLoginPage() {
     e.preventDefault()
     setLoading(true)
     setError("")
-    await new Promise((r) => setTimeout(r, 600))
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      setAdminAuthed()
-      router.push("/admin/dashboard")
-    } else {
-      setError("Invalid credentials. Please try again.")
+    try {
+      const account = await accountDb.authenticate(username, password)
+      if (account) {
+        setAdminSession(account.role, account.full_name || account.username)
+        router.push(ROLE_HOME[account.role])
+      } else {
+        setError("Invalid credentials. Please try again.")
+        setLoading(false)
+      }
+    } catch {
+      setError("Could not sign in. Please try again.")
       setLoading(false)
     }
   }
