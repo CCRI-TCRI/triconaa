@@ -6,8 +6,9 @@ import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/l
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
-import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize } from "lucide-react"
+import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize, Volume2, VolumeX } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
+import { supabase } from "@/lib/supabase"
 
 // ── Broadcast palette (election-night studio) ──────────────────
 const RED = "#e11d2a"
@@ -65,6 +66,8 @@ export default function BroadcastPage() {
   const [paused, setPaused] = useState(false)
   const [isFs, setIsFs] = useState(false)
   const [pageUrl, setPageUrl] = useState("")
+  const [muted, setMuted] = useState(false)
+  const [classTurnout, setClassTurnout] = useState<{ cls: string; voted: number; total: number; pct: number }[]>([])
 
   useEffect(() => {
     if (typeof window !== "undefined") setPageUrl(window.location.href)
@@ -118,6 +121,21 @@ export default function BroadcastPage() {
         totalVoters: users.length,
         votedCount,
       })
+      // Per-class turnout leaderboard
+      const byClass: Record<string, { voted: number; total: number }> = {}
+      for (const u of users) {
+        const cls = (u.class || "").trim()
+        if (!cls || cls === "—") continue
+        byClass[cls] = byClass[cls] || { voted: 0, total: 0 }
+        byClass[cls].total++
+        if (u.has_voted) byClass[cls].voted++
+      }
+      setClassTurnout(
+        Object.entries(byClass)
+          .map(([cls, v]) => ({ cls, voted: v.voted, total: v.total, pct: v.total ? (v.voted / v.total) * 100 : 0 }))
+          .sort((a, b) => b.pct - a.pct || b.total - a.total)
+          .slice(0, 8),
+      )
     } catch (e) {
       console.error("Broadcast data error:", e)
     } finally {
@@ -128,8 +146,37 @@ export default function BroadcastPage() {
   useEffect(() => {
     fetchData()
     const t = setInterval(fetchData, 5000)
-    return () => clearInterval(t)
+    // Realtime: refresh instantly when votes are cast or voters update.
+    const channel = supabase
+      .channel("broadcast-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => fetchData())
+      .subscribe()
+    return () => { clearInterval(t); supabase.removeChannel(channel) }
   }, [fetchData])
+
+  // Subtle audio cue when the coverage moves to a new slide.
+  const playCue = useCallback(() => {
+    if (muted || typeof window === "undefined") return
+    try {
+      const AC = (window.AudioContext || (window as any).webkitAudioContext)
+      if (!AC) return
+      const ctx = new AC()
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.connect(g); g.connect(ctx.destination)
+      o.frequency.setValueAtTime(660, ctx.currentTime)
+      o.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.12)
+      g.gain.setValueAtTime(0.0001, ctx.currentTime)
+      g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.03)
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35)
+      o.start()
+      o.stop(ctx.currentTime + 0.36)
+      o.onended = () => ctx.close()
+    } catch { /* ignore */ }
+  }, [muted])
+
+  useEffect(() => { if (!loading) playCue() }, [index]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // clock
   useEffect(() => {
@@ -139,19 +186,18 @@ export default function BroadcastPage() {
     return () => clearInterval(t)
   }, [])
 
-  // auto-advance post by post
+  // auto-advance through positions, then a final turnout slide
   useEffect(() => {
-    if (paused || races.length <= 1) return
-    const t = setTimeout(() => setIndex((i) => (i + 1) % races.length), DWELL_MS)
+    if (paused || races.length === 0) return
+    const slides = races.length + 1
+    const t = setTimeout(() => setIndex((i) => (i + 1) % slides), DWELL_MS)
     return () => clearTimeout(t)
   }, [paused, races.length, index])
 
   const go = useCallback((dir: number) => {
-    setRaces((r) => {
-      if (r.length) setIndex((i) => (i + dir + r.length) % r.length)
-      return r
-    })
-  }, [])
+    const n = races.length + 1
+    setIndex((i) => (i + dir + n) % n)
+  }, [races.length])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -178,7 +224,9 @@ export default function BroadcastPage() {
     )
   }
 
+  const onTurnout = index >= races.length
   const race = races[index]
+  const slides = races.length + 1
   const leaderTag = completed ? "WINNER" : "LEADING"
 
   // ── ticker headlines ─────────────────────────────────────────
@@ -258,13 +306,57 @@ export default function BroadcastPage() {
       <div className="relative z-10 min-h-0 flex-1 px-3 py-3 sm:px-7 sm:py-5">
         <AnimatePresence mode="wait">
           <motion.div
-            key={race.id}
+            key={onTurnout ? "turnout" : race.id}
             initial={{ opacity: 0, x: 60 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -60 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             className="flex h-full min-h-0 flex-col"
           >
+            {onTurnout ? (
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="mb-4 flex flex-none items-end justify-between gap-3 border-l-4 border-[#f5c542] pl-3 sm:pl-4">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#f5c542] sm:text-xs">Participation</p>
+                    <h2 className="text-3xl font-black uppercase leading-none tracking-tight sm:text-5xl">Voter Turnout</h2>
+                  </div>
+                  <div className="flex-none text-right">
+                    <p className="text-3xl font-black sm:text-5xl"><Pct value={stats.turnout} /></p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40 sm:text-[10px]">{stats.votedCount.toLocaleString()} / {stats.totalVoters.toLocaleString()}</p>
+                  </div>
+                </div>
+                {/* Thermometer */}
+                <div className="mb-5 flex-none">
+                  <div className="h-7 w-full overflow-hidden rounded-full bg-white/10 ring-1 ring-white/10">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(100, stats.turnout)}%` }}
+                      transition={{ duration: 1.1, ease: "easeOut" }}
+                      className="flex h-full items-center justify-end rounded-full bg-gradient-to-r from-[#e11d2a] via-[#f59e0b] to-[#f5c542] pr-3 text-xs font-black text-[#070b14]"
+                    >
+                      {stats.turnout >= 8 ? `${stats.turnout.toFixed(0)}%` : ""}
+                    </motion.div>
+                  </div>
+                </div>
+                {/* Class leaderboard */}
+                <p className="mb-2 flex-none text-[11px] font-black uppercase tracking-[0.3em] text-[#f5c542]">Turnout by class</p>
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {classTurnout.length === 0 && <div className="flex h-full items-center justify-center text-sm text-white/40">No class data yet.</div>}
+                  {classTurnout.map((c, i) => (
+                    <div key={c.cls} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 sm:px-4 ${i === 0 ? "border-[#f5c542]/60 bg-[#f5c542]/10" : "border-white/10 bg-white/[0.04]"}`}>
+                      <span className={`w-5 text-center text-lg font-black ${i === 0 ? "text-[#f5c542]" : "text-white/30"}`}>{i + 1}</span>
+                      <span className="w-16 flex-none font-black uppercase">{c.cls}</span>
+                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${c.pct}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{ background: i === 0 ? "linear-gradient(90deg,#e11d2a,#f5c542)" : "linear-gradient(90deg,#3b82f6,#60a5fa)" }} />
+                      </div>
+                      <span className={`w-12 flex-none text-right text-lg font-black tabular-nums ${i === 0 ? "text-[#f5c542]" : "text-white/80"}`}>{c.pct.toFixed(0)}%</span>
+                      <span className="w-16 flex-none text-right text-[11px] text-white/40">{c.voted}/{c.total}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+            <>
             {/* lower-third style headline */}
             <div className="mb-3 flex flex-none items-end justify-between gap-3 border-l-4 border-[#e11d2a] pl-3 sm:mb-4 sm:pl-4">
               <div className="min-w-0">
@@ -336,6 +428,8 @@ export default function BroadcastPage() {
                 <div className="flex h-full items-center justify-center text-sm text-white/40">No candidates for this position.</div>
               )}
             </div>
+            </>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -348,22 +442,25 @@ export default function BroadcastPage() {
             {paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
           </button>
           <button onClick={() => go(1)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Next"><ChevronRight className="h-5 w-5" /></button>
+          <button onClick={() => setMuted((m) => !m)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={muted ? "Unmute" : "Mute"}>
+            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </button>
           <button onClick={toggleFullscreen} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={isFs ? "Exit fullscreen" : "Fullscreen"}>
             {isFs ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
           </button>
         </div>
         <div className="hidden flex-1 items-center justify-center gap-1.5 sm:flex">
-          {races.map((_, i) => (
+          {Array.from({ length: slides }).map((_, i) => (
             <button
               key={i}
               onClick={() => setIndex(i)}
-              className={`h-1.5 rounded-full transition-all ${i === index ? "w-7 bg-[#e11d2a]" : "w-1.5 bg-white/20 hover:bg-white/40"}`}
-              aria-label={`Go to position ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${i === index ? "w-7 bg-[#e11d2a]" : "w-1.5 bg-white/20 hover:bg-white/40"} ${i === races.length ? "bg-[#f5c542]/60" : ""}`}
+              aria-label={i === races.length ? "Turnout slide" : `Go to position ${i + 1}`}
             />
           ))}
         </div>
         <p className="flex-none text-[11px] font-bold uppercase tracking-widest text-white/40">
-          {index + 1} / {races.length}{paused ? " · paused" : ""}
+          {index + 1} / {slides}{paused ? " · paused" : ""}
         </p>
       </div>
 
