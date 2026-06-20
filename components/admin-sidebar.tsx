@@ -7,6 +7,7 @@ import { useSchoolBranding } from "@/components/school-branding-provider"
 import { clearAdminAuthed, getAdminRole, getAdminName, roleCanAccess } from "@/components/admin-guard"
 import type { AdminRole } from "@/lib/db"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AccessibilityControls } from "@/components/accessibility-controls"
 import {
   Sidebar,
   SidebarContent,
@@ -200,6 +201,10 @@ export function AdminSidebar() {
         <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
           <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Dark mode</span>
           <ThemeToggle />
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Accessibility</span>
+          <AccessibilityControls />
         </div>
         {name && (
           <div className="px-2 pb-1 text-[11px] text-slate-400 dark:text-slate-500">

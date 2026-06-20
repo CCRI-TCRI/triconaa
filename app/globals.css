@@ -348,3 +348,27 @@ body {
 .dark body {
   background-color: #0b1120;
 }
+
+/* ── Accessibility: larger text + high contrast ─────────────── */
+html.a11y-large { font-size: 112.5%; }
+html.a11y-xlarge { font-size: 125%; }
+
+.a11y-contrast :focus-visible {
+  outline: 3px solid #1d4ed8 !important;
+  outline-offset: 2px;
+}
+/* Strengthen low-contrast (muted/light) text so it's clearly legible */
+.a11y-contrast .text-muted-foreground,
+.a11y-contrast .text-slate-400,
+.a11y-contrast .text-slate-500,
+.a11y-contrast .text-gray-400,
+.a11y-contrast .text-gray-500 { color: #0f172a !important; }
+.dark.a11y-contrast .text-muted-foreground,
+.dark.a11y-contrast .text-slate-400,
+.dark.a11y-contrast .text-slate-500,
+.dark.a11y-contrast .text-gray-400,
+.dark.a11y-contrast .text-gray-500 { color: #f1f5f9 !important; }
+/* Make borders more defined in high-contrast mode */
+.a11y-contrast .border,
+.a11y-contrast [class*="border-slate-"],
+.a11y-contrast [class*="border-gray-"] { border-color: #475569 !important; }

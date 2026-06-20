@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ScrollText,
   ShieldCheck,
+  Info,
 } from "lucide-react"
 import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
 import type { Position, Candidate } from "@/lib/db"
@@ -168,6 +169,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const [timeLeft, setTimeLeft] = useState(600)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [detail, setDetail] = useState<Candidate | null>(null)
 
   useEffect(() => {
     fetchElectionData()
@@ -537,6 +539,15 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                         <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-slate-500">
                           {candidate.manifesto || "No manifesto provided."}
                         </p>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); setDetail(candidate) }}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setDetail(candidate) } }}
+                          className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#168AAD] hover:underline"
+                        >
+                          <Info className="h-3 w-3" /> View details
+                        </span>
                       </div>
 
                       <div
@@ -585,6 +596,48 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Candidate detail (photo + full manifesto) */}
+      <AnimatePresence>
+        {detail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-4 sm:items-center"
+            onClick={() => setDetail(null)}
+          >
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 30, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center gap-3 border-b border-slate-100 p-4">
+                <CandidatePhoto src={detail.photo_url} name={detail.full_name} className="h-16 w-16 flex-none rounded-xl ring-1 ring-slate-200" textClass="text-lg" />
+                <div className="min-w-0">
+                  <h3 className="truncate text-lg font-bold text-slate-900">{detail.full_name}</h3>
+                  <p className="text-xs text-slate-500">{detail.class}</p>
+                </div>
+              </div>
+              <div className="max-h-[50vh] overflow-y-auto p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Manifesto</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{detail.manifesto || "No manifesto provided."}</p>
+              </div>
+              <div className="flex gap-2 border-t border-slate-100 p-4">
+                <Button variant="outline" className="flex-1" onClick={() => setDetail(null)}>Close</Button>
+                <Button
+                  className="flex-1 bg-[#168AAD] font-semibold text-white hover:bg-[#1A759F]"
+                  onClick={() => { const id = detail.id; setDetail(null); handleVote(id) }}
+                >
+                  Vote {detail.full_name.split(" ")[0]}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </BallotShell>
   )
 }

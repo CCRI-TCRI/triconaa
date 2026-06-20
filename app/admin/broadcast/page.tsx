@@ -7,6 +7,7 @@ import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
 import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 
 // ── Broadcast palette (election-night studio) ──────────────────
 const RED = "#e11d2a"
@@ -63,6 +64,11 @@ export default function BroadcastPage() {
   const [loading, setLoading] = useState(true)
   const [paused, setPaused] = useState(false)
   const [isFs, setIsFs] = useState(false)
+  const [pageUrl, setPageUrl] = useState("")
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setPageUrl(window.location.href)
+  }, [])
 
   const toggleFullscreen = useCallback(() => {
     if (typeof document === "undefined") return
@@ -208,6 +214,12 @@ export default function BroadcastPage() {
           </div>
         </div>
         <div className="flex flex-none items-center gap-3 sm:gap-5">
+          {pageUrl && (
+            <div className="hidden items-center gap-1.5 rounded-lg bg-white/95 px-1.5 py-1 sm:flex">
+              <QRCodeSVG value={pageUrl} size={34} bgColor="#ffffff" fgColor="#070b14" />
+              <span className="text-[9px] font-black uppercase leading-none tracking-wider text-[#070b14]">Watch<br />live</span>
+            </div>
+          )}
           <span className="hidden font-mono text-sm text-white/50 sm:inline">{clock}</span>
           <div className="flex items-center gap-2 rounded-md bg-[#e11d2a] px-3 py-1.5 shadow-lg shadow-[#e11d2a]/30">
             <motion.span animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.3, repeat: Infinity }}>

@@ -9,6 +9,7 @@ import { HolidayPopup } from "@/components/holiday-popup"
 import { SeasonalBackground } from "@/components/seasonal-background"
 import { AdminAccessButton } from "@/components/admin-access-button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { AccessibilityControls } from "@/components/accessibility-controls"
 import { SeasonalIntro } from "@/components/seasonal-intro"
 import { ElectionClosedScreen } from "@/components/election-closed-screen"
 import { WinnersScreen } from "@/components/winners-screen"
@@ -163,7 +164,10 @@ export default function VotingApp() {
         <SeasonalBackground theme={season.theme} />
         <BiometricAuth onAuthSuccess={handleAuthSuccess} />
         <AdminAccessButton />
-        <ThemeToggle variant="icon" className="fixed right-4 top-4 z-50" />
+        <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+          <AccessibilityControls />
+          <ThemeToggle variant="icon" />
+        </div>
         {showTutorial && <TutorialPopup onClose={handleTutorialClose} onComplete={handleTutorialPopupComplete} />}
         {showHolidayGreeting && <HolidayPopup onClose={handleHolidayClose} />}
       </div>
