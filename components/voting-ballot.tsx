@@ -30,10 +30,11 @@ interface PositionWithCandidates extends Position {
 
 interface VotingBallotProps {
   studentId: string
-  onVoteComplete: () => void
+  onVoteComplete: (receipt?: string) => void
 }
 
 const MAROON = "#168AAD"
+const ABSTAIN = "ABSTAIN" // sentinel stored in `votes` when a voter abstains on a position
 
 const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60)
@@ -258,11 +259,11 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
         return
       }
 
-      const voteRecords = Object.entries(votes).map(([positionId, candidateId]) => ({
-        user_id: user.id,
-        candidate_id: candidateId,
-        position_id: positionId,
-      }))
+      const voteRecords = Object.entries(votes).map(([positionId, candidateId]) =>
+        candidateId === ABSTAIN
+          ? { user_id: user.id, candidate_id: null, position_id: positionId, is_abstain: true }
+          : { user_id: user.id, candidate_id: candidateId, position_id: positionId, is_abstain: false },
+      )
 
       const success = await voteDb.createBatch(voteRecords)
       if (!success) {
@@ -270,9 +271,9 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
         return
       }
 
-      await userDb.markAsVoted(user.id)
+      const receipt = await userDb.markAsVoted(user.id)
       toast.success("Votes submitted successfully!")
-      onVoteComplete()
+      onVoteComplete(receipt)
     } catch (error) {
       console.error("Error submitting votes:", error)
       toast.error("Failed to submit votes. Please try again.")
@@ -383,6 +384,8 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                         <p className="text-[11px] uppercase tracking-wide text-slate-400">{position.name}</p>
                         {selectedCandidate ? (
                           <p className="font-semibold text-slate-900">{selectedCandidate.full_name}</p>
+                        ) : votes[position.id] === ABSTAIN ? (
+                          <p className="font-semibold text-amber-600">Abstained</p>
                         ) : (
                           <p className="font-semibold text-amber-600">No selection</p>
                         )}
@@ -561,6 +564,21 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                   )
                 })}
               </div>
+
+              {/* Abstain — formally decline to choose for this position */}
+              <button
+                type="button"
+                onClick={() => handleVote(ABSTAIN)}
+                disabled={isTransitioning}
+                className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed py-2.5 text-sm font-semibold transition-all ${
+                  votes[currentPosition.id] === ABSTAIN
+                    ? "border-amber-400 bg-amber-50 text-amber-700"
+                    : "border-slate-300 text-slate-500 hover:border-amber-400 hover:text-amber-600"
+                }`}
+              >
+                {votes[currentPosition.id] === ABSTAIN && <Check className="h-4 w-4" />}
+                Abstain / no preference for {currentPosition.name}
+              </button>
             </div>
 
             {/* Nav */}

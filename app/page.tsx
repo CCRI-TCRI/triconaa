@@ -19,6 +19,7 @@ import { motion } from "framer-motion"
 import { CheckCircle, Trophy, Sparkles, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { userDb } from "@/lib/db"
+import { toast } from "sonner"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { getSeasonByTheme, getSeasonalContainerClass } from "@/lib/seasons"
 
@@ -47,6 +48,7 @@ export default function VotingApp() {
   const [showTutorial, setShowTutorial] = useState(false)
   const [showHolidayGreeting, setShowHolidayGreeting] = useState(false)
   const [celebration, setCelebration] = useState<{ headline: string; effect: "confetti" | "fireworks" } | null>(null)
+  const [receipt, setReceipt] = useState("")
 
   // Season is driven by the admin Settings (falls back to date-based when "auto")
   const season = getSeasonByTheme(seasonalTheme)
@@ -100,18 +102,36 @@ export default function VotingApp() {
   }, [season.theme])
 
   const handleAuthSuccess = async (id: string) => {
-    setStudentId(id)
     try {
       const user = await userDb.getById(id)
+      if (user?.has_voted) {
+        toast.error("This voting code has already been used.")
+        return
+      }
+      // Device / session lock — block a code being used on two devices at once.
+      const existing = sessionStorage.getItem(`vote_session_${id}`) || undefined
+      const session = await userDb.startSession(id, existing)
+      if (!session.ok) {
+        toast.error(session.reason === "voted"
+          ? "This voting code has already been used."
+          : "This voting code is already in use on another device. Try again shortly.")
+        return
+      }
+      sessionStorage.setItem(`vote_session_${id}`, session.token)
+      setStudentId(id)
       if (user) setStudentName(user.full_name)
     } catch (error) {
       console.error("Error fetching user data:", error)
+      setStudentId(id)
     }
     setAppState("tutorial")
   }
 
   const handleTutorialComplete = () => setAppState("voting")
-  const handleVoteComplete = () => setAppState("complete")
+  const handleVoteComplete = (r?: string) => {
+    if (r) setReceipt(r)
+    setAppState("complete")
+  }
 
   const handleTutorialClose = () => {
     setShowTutorial(false)
@@ -251,6 +271,19 @@ export default function VotingApp() {
               </div>
 
               <p className="text-lg opacity-80">Results will be announced after the voting period ends.</p>
+
+              {receipt && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 1.0 }}
+                  className="mx-auto mt-4 w-fit rounded-xl border border-white/25 bg-white/10 px-6 py-3 backdrop-blur-sm"
+                >
+                  <p className="text-xs uppercase tracking-widest text-white/70">Your vote receipt</p>
+                  <p className="mt-1 font-mono text-2xl font-black tracking-wider">{receipt}</p>
+                  <p className="mt-1 text-xs text-white/60">Proof you voted · does not reveal your choices</p>
+                </motion.div>
+              )}
 
               {season.theme !== "default" && (
                 <motion.div

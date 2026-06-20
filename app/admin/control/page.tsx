@@ -18,12 +18,26 @@ import {
 } from "@/components/ui/alert-dialog"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles, ShieldAlert, Lock, Megaphone, Volume2, Timer } from "lucide-react"
+import { Power, PauseCircle, StopCircle, RefreshCw, Vote, Users, Flag, Trophy, AlertTriangle, Sparkles, ShieldAlert, Lock, Megaphone, Volume2, Timer, ShieldCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { userDb, voteDb, electionControl, broadcastDb, type ElectionStatus } from "@/lib/db"
 import { BRANDING_UPDATED_EVENT } from "@/components/school-branding-provider"
+import { getAdminRole, getAdminName } from "@/components/admin-guard"
+import { toast } from "sonner"
+
+// Convert an ISO timestamp to a value for <input type="datetime-local"> (local time).
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  const off = d.getTimezoneOffset()
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16)
+}
+function fromLocalInput(val: string): string | null {
+  if (!val) return null
+  return new Date(val).toISOString()
+}
 
 const STATUS_META: Record<ElectionStatus, { label: string; color: string; desc: string }> = {
   active: { label: "Active", color: "bg-green-100 text-green-700", desc: "Voting is open. Students can log in and cast their ballots." },
@@ -42,6 +56,10 @@ export default function ControlSystemPage() {
   const [code5Interval, setCode5Interval] = useState(0)
   const [code5Input, setCode5Input] = useState("0")
   const [includeUnopposed, setIncludeUnopposed] = useState(false)
+  const [openAt, setOpenAt] = useState("")
+  const [closeAt, setCloseAt] = useState("")
+  const [cert, setCert] = useState<{ certified: boolean; chair: string | null; head: string | null; at: string | null }>({ certified: false, chair: null, head: null, at: null })
+  const [myRole, setMyRole] = useState<string>("admin")
 
   useEffect(() => {
     refresh()
@@ -57,15 +75,36 @@ export default function ControlSystemPage() {
   }, [code5Interval])
 
   const refresh = async () => {
-    const [{ status, term, includeUnopposed }, b] = await Promise.all([electionControl.get(), broadcastDb.get()])
-    setStatus(status)
-    setTerm(term)
-    setIncludeUnopposed(includeUnopposed)
+    const [ctl, b] = await Promise.all([electionControl.get(), broadcastDb.get()])
+    setStatus(ctl.rawStatus)
+    setTerm(ctl.term)
+    setIncludeUnopposed(ctl.includeUnopposed)
+    setOpenAt(toLocalInput(ctl.openAt))
+    setCloseAt(toLocalInput(ctl.closeAt))
+    setCert(ctl.certification)
+    setMyRole(getAdminRole() || "admin")
     setLockdown(b.lockdown)
     setCode5Interval(b.code5Interval)
     setCode5Input(String(b.code5Interval))
     loadStats()
   }
+
+  const saveSchedule = async () => {
+    const ok = await electionControl.setSchedule(fromLocalInput(openAt), fromLocalInput(closeAt))
+    if (ok) toast.success("Schedule saved")
+    else toast.error("Could not save schedule")
+  }
+  const clearSchedule = async () => {
+    setOpenAt(""); setCloseAt("")
+    await electionControl.setSchedule(null, null)
+    toast.success("Schedule cleared")
+  }
+  const sign = async (slot: "chair" | "head") => {
+    const name = getAdminName() || (slot === "chair" ? "Chairperson" : "Head Teacher")
+    const ok = await electionControl.certify(slot, name)
+    if (ok) { toast.success("Signed"); refresh() } else toast.error("Could not sign")
+  }
+  const resetCert = async () => { await electionControl.resetCertification(); refresh() }
 
   const toggleIncludeUnopposed = async (on: boolean) => {
     setIncludeUnopposed(on)
@@ -276,6 +315,67 @@ export default function ControlSystemPage() {
             </div>
             <Switch checked={includeUnopposed} onCheckedChange={toggleIncludeUnopposed} aria-label="Include unopposed positions on the ballot" />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Scheduled open / close */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Timer className="h-5 w-5" />Scheduled Open / Close</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Voting automatically stays closed before the open time and after the close time. Leave a field blank to ignore that bound.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Opens at</Label>
+              <Input type="datetime-local" value={openAt} onChange={(e) => setOpenAt(e.target.value)} />
+            </div>
+            <div>
+              <Label>Closes at</Label>
+              <Input type="datetime-local" value={closeAt} onChange={(e) => setCloseAt(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={saveSchedule} className="gap-2"><Timer className="h-4 w-4" />Save schedule</Button>
+            <Button onClick={clearSchedule} variant="outline">Clear</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results certification */}
+      <Card className={cert.certified ? "border-emerald-300" : ""}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" />Results Certification</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Freeze &amp; sign: both the Electoral Commission chairperson and the head teacher confirm the final results.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className={`rounded-lg border p-3 ${cert.chair ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-500/10" : ""}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chairperson</p>
+              {cert.chair ? <p className="mt-1 font-semibold text-emerald-700 dark:text-emerald-400">✓ Signed by {cert.chair}</p>
+                : <Button size="sm" className="mt-2" disabled={!(myRole === "chairperson" || myRole === "admin")} onClick={() => sign("chair")}>Sign as chairperson</Button>}
+            </div>
+            <div className={`rounded-lg border p-3 ${cert.head ? "border-emerald-300 bg-emerald-50 dark:bg-emerald-500/10" : ""}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Head Teacher</p>
+              {cert.head ? <p className="mt-1 font-semibold text-emerald-700 dark:text-emerald-400">✓ Signed by {cert.head}</p>
+                : <Button size="sm" className="mt-2" disabled={!(myRole === "headteacher" || myRole === "admin")} onClick={() => sign("head")}>Sign as head teacher</Button>}
+            </div>
+          </div>
+          {cert.certified && (
+            <Alert className="border-emerald-300 bg-emerald-50 dark:bg-emerald-500/10">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <AlertDescription className="text-emerald-800 dark:text-emerald-300">
+                Results certified on {cert.at ? new Date(cert.at).toLocaleString() : ""}. Download the signed certificate from the Live Results page.
+              </AlertDescription>
+            </Alert>
+          )}
+          {(cert.chair || cert.head) && (
+            <Button variant="ghost" size="sm" className="text-rose-600 hover:bg-rose-50" onClick={resetCert}>Reset certification</Button>
+          )}
         </CardContent>
       </Card>
 

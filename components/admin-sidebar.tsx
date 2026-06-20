@@ -38,6 +38,7 @@ import {
   Radio,
   KeyRound,
   UserCog,
+  History,
 } from "lucide-react"
 
 const menuItems = [
@@ -123,6 +124,11 @@ const menuItems = [
         title: "Accounts",
         url: "/admin/accounts",
         icon: UserCog,
+      },
+      {
+        title: "Audit Log",
+        url: "/admin/audit",
+        icon: History,
       },
       {
         title: "Settings",
