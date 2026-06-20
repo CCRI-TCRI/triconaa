@@ -39,6 +39,7 @@ import {
   KeyRound,
   UserCog,
   History,
+  Archive,
 } from "lucide-react"
 
 const menuItems = [
@@ -114,6 +115,11 @@ const menuItems = [
         title: "Reports",
         url: "/admin/reports",
         icon: FileText,
+      },
+      {
+        title: "Archive",
+        url: "/admin/archive",
+        icon: Archive,
       },
     ],
   },

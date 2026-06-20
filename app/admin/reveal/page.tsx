@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence, animate, useMotionValue } from "framer-motion"
 import { QRCodeSVG } from "qrcode.react"
-import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
+import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
+import { downloadWinnerCertificates } from "@/lib/certificates"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
@@ -209,6 +210,25 @@ export default function RevealShowPage() {
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
   }, [advance])
+
+  const handleCertificates = useCallback(async () => {
+    const winners = races
+      .map((r) => ({ position: r.name, winner: r.candidates[0] }))
+      .filter((x) => x.winner && x.winner.votes > 0)
+      .map((x) => ({ position: x.position, name: x.winner.full_name }))
+    if (winners.length === 0) return
+    const ctl = await electionControl.get()
+    await downloadWinnerCertificates({
+      winners,
+      schoolName,
+      motto,
+      term: ctl.term,
+      logoUrl,
+      certifiedChair: ctl.certification.chair,
+      certifiedHead: ctl.certification.head,
+      certifiedAt: ctl.certification.at,
+    })
+  }, [races, schoolName, motto, logoUrl])
 
   // ── winner poster ─────────────────────────────────────────────
   const loadImg = (src: string, cross = false) =>
@@ -624,9 +644,14 @@ export default function RevealShowPage() {
                 )
               })}
             </div>
-            <button onClick={(e) => { e.stopPropagation(); fireConfetti() }} className="mt-8 inline-flex items-center gap-2 rounded-full bg-white/10 px-6 py-2 text-sm font-semibold hover:bg-white/20">
-              <Sparkles className="h-4 w-4 text-amber-300" /> More confetti
-            </button>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <button onClick={(e) => { e.stopPropagation(); fireConfetti() }} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-6 py-2 text-sm font-semibold hover:bg-white/20">
+                <Sparkles className="h-4 w-4 text-amber-300" /> More confetti
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); handleCertificates() }} className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-2 text-sm font-black text-[#3b0a14] hover:bg-amber-300">
+                <Download className="h-4 w-4" /> Winner certificates
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

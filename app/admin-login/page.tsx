@@ -16,6 +16,24 @@ export default function AdminLoginPage() {
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [mode, setMode] = useState<"login" | "reset">("login")
+  const [resetUser, setResetUser] = useState("")
+  const [resetQuestion, setResetQuestion] = useState<string | null>(null)
+  const [resetAnswer, setResetAnswer] = useState("")
+  const [resetNew, setResetNew] = useState("")
+  const [resetMsg, setResetMsg] = useState("")
+
+  const lookupQuestion = async () => {
+    setResetMsg("")
+    const q = await accountDb.getSecurityQuestion(resetUser)
+    if (!q) { setResetMsg("No security question is set for that username."); setResetQuestion(null); return }
+    setResetQuestion(q)
+  }
+  const doReset = async () => {
+    const ok = await accountDb.resetPassword(resetUser, resetAnswer, resetNew)
+    if (ok) { setResetMsg("Password updated — you can sign in now."); setTimeout(() => { setMode("login"); setResetQuestion(null) }, 1200) }
+    else setResetMsg("Incorrect answer, or reset isn't available for this account.")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,7 +113,7 @@ export default function AdminLoginPage() {
                 <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                 Remember me
               </label>
-              <span className="cursor-default text-slate-400">Forgot password?</span>
+              <button type="button" onClick={() => setMode("reset")} className="cursor-pointer text-indigo-600 hover:underline">Forgot password?</button>
             </div>
 
             {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</p>}
@@ -111,6 +129,35 @@ export default function AdminLoginPage() {
           </form>
         </div>
       </div>
+
+      {mode === "reset" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setMode("login")}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-800">Reset password</h3>
+            <p className="mt-1 text-xs text-slate-500">Answer your security question to set a new password.</p>
+            <div className="mt-4 space-y-3">
+              <input
+                value={resetUser}
+                onChange={(e) => setResetUser(e.target.value)}
+                placeholder="Username"
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+              />
+              {!resetQuestion ? (
+                <button onClick={lookupQuestion} className="w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">Continue</button>
+              ) : (
+                <>
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{resetQuestion}</p>
+                  <input value={resetAnswer} onChange={(e) => setResetAnswer(e.target.value)} placeholder="Your answer" className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200" />
+                  <input type="password" value={resetNew} onChange={(e) => setResetNew(e.target.value)} placeholder="New password" className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200" />
+                  <button onClick={doReset} className="w-full rounded-full bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">Update password</button>
+                </>
+              )}
+              {resetMsg && <p className="text-sm text-slate-600">{resetMsg}</p>}
+              <button onClick={() => { setMode("login"); setResetQuestion(null); setResetMsg("") }} className="w-full text-center text-sm text-slate-400 hover:text-slate-600">Back to sign in</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

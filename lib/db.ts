@@ -531,10 +531,17 @@ export const accountDb = {
     return (data ?? []) as AdminAccount[]
   },
 
-  create: async (account: { username: string; password: string; role: AdminRole; full_name?: string }): Promise<AdminAccount | null> => {
+  create: async (account: { username: string; password: string; role: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string }): Promise<AdminAccount | null> => {
     const { data, error } = await supabase
       .from("admin_accounts")
-      .insert([{ username: account.username.trim(), password: account.password, role: account.role, full_name: account.full_name?.trim() || null }])
+      .insert([{
+        username: account.username.trim(),
+        password: account.password,
+        role: account.role,
+        full_name: account.full_name?.trim() || null,
+        security_question: account.securityQuestion || null,
+        security_answer: account.securityAnswer || null,
+      }])
       .select("id, username, role, full_name, created_at")
       .single()
     if (error) { console.error("accountDb.create:", error.message); return null }

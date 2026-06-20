@@ -27,10 +27,10 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [form, setForm] = useState({ username: "", password: "", role: "headteacher" as AdminRole, full_name: "" })
+  const [form, setForm] = useState({ username: "", password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "" })
 
   const [editing, setEditing] = useState<AdminAccount | null>(null)
-  const [editForm, setEditForm] = useState({ password: "", role: "headteacher" as AdminRole, full_name: "" })
+  const [editForm, setEditForm] = useState({ password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "" })
 
   const load = async () => {
     setLoading(true)
@@ -51,14 +51,14 @@ export default function AccountsPage() {
     setSaving(false)
     if (!created) { toast.error("Could not create account — the username may already exist"); return }
     toast.success(`Account "${created.username}" created`)
-    setForm({ username: "", password: "", role: "headteacher", full_name: "" })
+    setForm({ username: "", password: "", role: "headteacher", full_name: "", securityQuestion: "", securityAnswer: "" })
     setAddOpen(false)
     load()
   }
 
   const openEdit = (a: AdminAccount) => {
     setEditing(a)
-    setEditForm({ password: "", role: a.role, full_name: a.full_name || "" })
+    setEditForm({ password: "", role: a.role, full_name: a.full_name || "", securityQuestion: "", securityAnswer: "" })
   }
 
   const saveEdit = async () => {
@@ -72,6 +72,8 @@ export default function AccountsPage() {
       password: editForm.password || undefined,
       role: editForm.role,
       full_name: editForm.full_name,
+      securityQuestion: editForm.securityQuestion || undefined,
+      securityAnswer: editForm.securityAnswer || undefined,
     })
     setSaving(false)
     if (!ok) { toast.error("Could not update account"); return }
@@ -120,6 +122,8 @@ export default function AccountsPage() {
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">{ROLE_META[form.role].desc}</p>
               </div>
+              <div><Label>Security question (for password reset)</Label><Input value={form.securityQuestion} onChange={(e) => setForm((p) => ({ ...p, securityQuestion: e.target.value }))} placeholder="e.g. Your first school?" /></div>
+              <div><Label>Security answer</Label><Input value={form.securityAnswer} onChange={(e) => setForm((p) => ({ ...p, securityAnswer: e.target.value }))} /></div>
               <Button onClick={addAccount} disabled={saving} className="w-full">{saving ? "Creating…" : "Create account"}</Button>
             </div>
           </DialogContent>
@@ -189,6 +193,8 @@ export default function AccountsPage() {
               </Select>
               <p className="mt-1 text-xs text-muted-foreground">{ROLE_META[editForm.role].desc}</p>
             </div>
+            <div><Label>Security question</Label><Input value={editForm.securityQuestion} onChange={(e) => setEditForm((p) => ({ ...p, securityQuestion: e.target.value }))} placeholder="leave blank to keep current" /></div>
+            <div><Label>Security answer</Label><Input value={editForm.securityAnswer} onChange={(e) => setEditForm((p) => ({ ...p, securityAnswer: e.target.value }))} placeholder="leave blank to keep current" /></div>
             <Button onClick={saveEdit} disabled={saving} className="w-full">{saving ? "Saving…" : "Save changes"}</Button>
           </div>
         </DialogContent>
