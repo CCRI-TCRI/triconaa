@@ -19,7 +19,7 @@ import { toast } from "@/hooks/use-toast"
 import { candidateDb, positionDb } from "@/lib/db"
 import type { Candidate, Position } from "@/lib/db"
 import { supabase } from "@/lib/supabase"
-import { UserPlus, Trash2, Edit, RefreshCw, Search } from "lucide-react"
+import { UserPlus, Trash2, Edit, RefreshCw, Search, Upload } from "lucide-react"
 
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
@@ -35,6 +35,63 @@ export default function CandidatesPage() {
     student_id: "", full_name: "", class: "", position_id: "", manifesto: "", photo_url: "",
   })
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [showImport, setShowImport] = useState(false)
+  const [importRows, setImportRows] = useState<{ full_name: string; class: string; position_id: string; positionName: string; manifesto: string; photo_url: string; valid: boolean; note?: string }[]>([])
+  const [importing, setImporting] = useState(false)
+
+  const rowsFromMatrix = (matrix: any[][]) => {
+    const cleaned = matrix.map((r) => (Array.isArray(r) ? r.map((c) => (c == null ? "" : String(c).trim())) : [])).filter((r) => r.some((c) => c !== ""))
+    if (cleaned.length === 0) { setImportRows([]); return }
+    const header = cleaned[0].map((h) => h.toLowerCase())
+    const idx = (keys: string[]) => header.findIndex((h) => keys.some((k) => h.includes(k)))
+    const nameI = idx(["name", "candidate"]), classI = idx(["class", "stream", "form"]), posI = idx(["position", "post", "portfolio", "office"]), manI = idx(["manifesto", "slogan", "about"]), photoI = idx(["photo", "image", "picture", "url"])
+    const hasHeader = nameI >= 0
+    const dataRows = hasHeader ? cleaned.slice(1) : cleaned
+    const posByName = new Map(positions.map((p) => [p.name.toLowerCase(), p.id]))
+    const rows = dataRows.map((r) => {
+      const full_name = (hasHeader ? r[nameI] : r[0]) || ""
+      const cls = (hasHeader && classI >= 0 ? r[classI] : r[1]) || ""
+      const posName = (hasHeader && posI >= 0 ? r[posI] : r[2]) || ""
+      const manifesto = (hasHeader && manI >= 0 ? r[manI] : "") || ""
+      const photo_url = (hasHeader && photoI >= 0 ? r[photoI] : "") || ""
+      const position_id = posByName.get(posName.toLowerCase()) || ""
+      const valid = !!full_name && !!position_id
+      const note = !full_name ? "Missing name" : !position_id ? `Unknown position "${posName}"` : undefined
+      return { full_name, class: cls, position_id, positionName: posName, manifesto, photo_url, valid, note }
+    })
+    setImportRows(rows)
+  }
+
+  const parseImportFile = async (file?: File) => {
+    if (!file) return
+    try {
+      const XLSX = await import("xlsx")
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: "array" })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      rowsFromMatrix(XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][])
+    } catch {
+      toast({ title: "Could not read file", description: "Use a .csv or .xlsx file.", variant: "destructive" })
+    }
+  }
+
+  const commitImport = async () => {
+    const valid = importRows.filter((r) => r.valid)
+    if (valid.length === 0) { toast({ title: "Nothing to import", description: "No valid rows found.", variant: "destructive" }); return }
+    setImporting(true)
+    const payload = valid.map((r) => ({
+      student_id: "CN" + Math.random().toString(36).slice(2, 8).toUpperCase(),
+      full_name: r.full_name,
+      class: r.class || "—",
+      position_id: r.position_id,
+      manifesto: r.manifesto,
+      photo_url: r.photo_url,
+    }))
+    const n = await candidateDb.createBatch(payload as any)
+    setImporting(false)
+    toast({ title: "Import complete", description: `${n} candidate${n === 1 ? "" : "s"} added.` })
+    setShowImport(false); setImportRows([]); fetchData()
+  }
 
   const classes = ["S1A", "S1B", "S2A", "S2B", "S3A", "S3B", "S4A", "S4B", "S5A", "S5B", "S6A", "S6B"]
 
@@ -259,6 +316,44 @@ export default function CandidatesPage() {
         </div>
         <div className="flex gap-2">
           <Button onClick={fetchData} variant="outline"><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+          <Dialog open={showImport} onOpenChange={(o) => { setShowImport(o); if (!o) setImportRows([]) }}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={positions.length === 0}><Upload className="w-4 h-4 mr-2" />Bulk Import</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Import candidates</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Upload a CSV or Excel file with columns: <b>Name</b>, <b>Class</b>, <b>Position</b> (must match an existing position name), and optionally <b>Manifesto</b> and <b>Photo URL</b>.
+                </p>
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => parseImportFile(e.target.files?.[0])} className="block w-full text-sm" />
+                {importRows.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-emerald-600">{importRows.filter((r) => r.valid).length} ready</span>
+                      <span className="text-rose-500">{importRows.filter((r) => !r.valid).length} skipped</span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50"><tr><th className="p-2 text-left">Name</th><th className="p-2 text-left">Class</th><th className="p-2 text-left">Position</th><th className="p-2 text-left">Status</th></tr></thead>
+                        <tbody>
+                          {importRows.map((r, i) => (
+                            <tr key={i} className="border-t">
+                              <td className="p-2">{r.full_name || <span className="text-rose-500">—</span>}</td>
+                              <td className="p-2">{r.class}</td>
+                              <td className="p-2">{r.positionName}</td>
+                              <td className="p-2">{r.valid ? <span className="text-emerald-600">OK</span> : <span className="text-rose-500">{r.note}</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button onClick={commitImport} disabled={importing} className="w-full">{importing ? "Importing…" : `Import ${importRows.filter((r) => r.valid).length} candidates`}</Button>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
             <DialogTrigger asChild>
               <Button disabled={positions.length === 0}><UserPlus className="w-4 h-4 mr-2" />Add Candidate</Button>

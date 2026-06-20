@@ -36,6 +36,23 @@ interface VotingBallotProps {
 const MAROON = "#168AAD"
 const ABSTAIN = "ABSTAIN" // sentinel stored in `votes` when a voter abstains on a position
 
+// ── Lightweight ballot localisation (English / Luganda) ─────────
+type Lang = "en" | "lg"
+const DICT: Record<string, { en: string; lg: string }> = {
+  ballot: { en: "Official Ballot", lg: "Akalulu" },
+  selectOne: { en: "Select one candidate", lg: "Londa omu" },
+  previous: { en: "Previous", lg: "Emabega" },
+  next: { en: "Next", lg: "Mu maaso" },
+  review: { en: "Review Ballot", lg: "Kebera akalulu" },
+  viewDetails: { en: "View details", lg: "Laba ebisingawo" },
+  cast: { en: "Cast My Ballot", lg: "Weereza akalulu" },
+  back: { en: "Back", lg: "Emabega" },
+  reviewTitle: { en: "Review Your Ballot", lg: "Kebera akalulu ko" },
+  selectFirst: { en: "Please select a candidate first", lg: "Sooka olonde omu" },
+  noManifesto: { en: "No manifesto provided.", lg: "Tewali manifesto." },
+}
+const LANG_KEY = "ballot-lang"
+
 const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -50,12 +67,16 @@ function BallotShell({
   logoUrl,
   timeLeft,
   children,
+  lang = "en",
+  onToggleLang,
 }: {
   schoolName: string
   motto: string
   logoUrl: string
   timeLeft: number
   children: React.ReactNode
+  lang?: Lang
+  onToggleLang?: () => void
 }) {
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-slate-50">
@@ -68,21 +89,32 @@ function BallotShell({
             </div>
             <div className="min-w-0 leading-tight">
               <h1 className="truncate text-sm font-semibold sm:text-base">{schoolName}</h1>
-              <p className="truncate text-[11px] text-[#D9ED92]/90">"{motto}" · Official Ballot</p>
+              <p className="truncate text-[11px] text-[#D9ED92]/90">"{motto}" · {DICT.ballot[lang]}</p>
             </div>
           </div>
-          <div
-            className={`flex flex-none items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums sm:gap-2 sm:px-3 ${
-              timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-[#D9ED92] ring-1 ring-white/15"
-            }`}
-          >
-            <Clock className="h-4 w-4" />
-            {formatTime(timeLeft)}
-            {timeLeft <= 60 && (
-              <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-                <AlertTriangle className="h-4 w-4" />
-              </motion.span>
+          <div className="flex flex-none items-center gap-2">
+            {onToggleLang && (
+              <button
+                onClick={onToggleLang}
+                className="rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide text-[#D9ED92] ring-1 ring-white/15 hover:bg-white/20"
+                aria-label="Switch language"
+              >
+                {lang === "en" ? "EN" : "LG"}
+              </button>
             )}
+            <div
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold tabular-nums sm:gap-2 sm:px-3 ${
+                timeLeft <= 60 ? "bg-red-500 text-white" : "bg-white/10 text-[#D9ED92] ring-1 ring-white/15"
+              }`}
+            >
+              <Clock className="h-4 w-4" />
+              {formatTime(timeLeft)}
+              {timeLeft <= 60 && (
+                <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <AlertTriangle className="h-4 w-4" />
+                </motion.span>
+              )}
+            </div>
           </div>
         </div>
         <div className="h-1 bg-gradient-to-r from-[#D9ED92] via-[#76C893] to-[#34A0A4]" />
@@ -171,6 +203,14 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [detail, setDetail] = useState<Candidate | null>(null)
+  const [lang, setLang] = useState<Lang>("en")
+  const t = (k: keyof typeof DICT) => DICT[k][lang]
+
+  useEffect(() => {
+    const saved = (localStorage.getItem(LANG_KEY) as Lang) || "en"
+    setLang(saved)
+  }, [])
+  const toggleLang = () => setLang((l) => { const n = l === "en" ? "lg" : "en"; localStorage.setItem(LANG_KEY, n); return n })
 
   useEffect(() => {
     fetchElectionData()
@@ -356,7 +396,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   // ── Confirmation (ballot receipt) ───────────────────────────
   if (showConfirmation) {
     return (
-      <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
+      <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft} lang={lang} onToggleLang={toggleLang}>
         <div className="h-full overflow-y-auto px-4 py-4">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -368,7 +408,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 <ShieldCheck className="h-6 w-6 text-[#168AAD]" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Review Your Ballot</h2>
+                <h2 className="text-lg font-bold text-slate-900">{t("reviewTitle")}</h2>
                 <p className="text-xs text-slate-500">Confirm your selections before casting · {formatTime(timeLeft)} left</p>
               </div>
             </div>
@@ -418,7 +458,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                   className="border-slate-200 text-slate-700 hover:bg-slate-50 sm:w-1/3"
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" />
-                  Back
+                  {t("back")}
                 </Button>
                 <Button
                   onClick={submitVotes}
@@ -433,7 +473,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                   ) : (
                     <>
                       <ScrollText className="mr-2 h-4 w-4" />
-                      Cast My Ballot
+                      {t("cast")}
                     </>
                   )}
                 </Button>
@@ -449,7 +489,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
   const progressPct = Math.round((votedCount / positions.length) * 100)
 
   return (
-    <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft}>
+    <BallotShell schoolName={schoolName} motto={motto} logoUrl={logoUrl} timeLeft={timeLeft} lang={lang} onToggleLang={toggleLang}>
       <div className="mx-auto flex h-full max-w-5xl flex-col px-3 py-3 sm:px-4">
         {/* Stepper */}
         <div className="mb-3 flex-none">
@@ -504,7 +544,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 <h2 className="truncate text-lg font-bold text-slate-900 sm:text-2xl">{currentPosition.name}</h2>
               </div>
               <span className="hidden flex-none rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 sm:block">
-                Select one candidate
+                {t("selectOne")}
               </span>
             </div>
 
@@ -549,7 +589,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setDetail(candidate) } }}
                           className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#168AAD] hover:underline"
                         >
-                          <Info className="h-3 w-3" /> View details
+                          <Info className="h-3 w-3" /> {t("viewDetails")}
                         </span>
                       </div>
 
@@ -591,7 +631,7 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                 className="text-slate-600 hover:bg-slate-100 disabled:opacity-40"
               >
                 <ChevronLeft className="mr-1.5 h-4 w-4" />
-                Previous
+                {t("previous")}
               </Button>
               <Button
                 onClick={() => {
@@ -600,14 +640,14 @@ export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
                     if (next < positions.length) setCurrentPositionIndex(next)
                     else setShowConfirmation(true)
                   } else {
-                    toast.info("Please select a candidate first")
+                    toast.info(t("selectFirst"))
                   }
                 }}
                 disabled={!votes[currentPosition.id]}
                 size="sm"
                 className="bg-[#168AAD] font-semibold text-white hover:bg-[#1A759F] disabled:opacity-40"
               >
-                {currentPositionIndex === positions.length - 1 ? "Review Ballot" : "Next"}
+                {currentPositionIndex === positions.length - 1 ? t("review") : t("next")}
                 <ChevronRight className="ml-1.5 h-4 w-4" />
               </Button>
             </div>
