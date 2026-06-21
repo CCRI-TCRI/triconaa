@@ -40,6 +40,7 @@ import {
   UserCog,
   History,
   Archive,
+  Layers,
 } from "lucide-react"
 
 const menuItems = [
@@ -50,6 +51,11 @@ const menuItems = [
         title: "Dashboard",
         url: "/admin/dashboard",
         icon: LayoutDashboard,
+      },
+      {
+        title: "Elections",
+        url: "/admin/elections",
+        icon: Layers,
       },
       {
         title: "Control System",

@@ -4,19 +4,60 @@ import type { User, Candidate, Position, Vote } from "@/lib/supabase"
 
 export type { User, Candidate, Position, Vote }
 
+// ── Multi-election scoping ────────────────────────────────────
+// The platform can host several independent elections. Every voter, candidate,
+// position and vote carries an election_id. Scoping is *gated* behind a one-time
+// capability probe so the app behaves exactly as a single election (no filtering)
+// until the multi-election migration has been applied — keeping the live data safe.
+const ELECTION_KEY = "tricona_election_id"
+let _scopeAvail: boolean | null = null
+let _primaryId: string | null | undefined = undefined
+
+export async function scopingAvailable(): Promise<boolean> {
+  if (_scopeAvail !== null) return _scopeAvail
+  const { error } = await supabase.from("elections").select("id").limit(1)
+  _scopeAvail = !error
+  return _scopeAvail
+}
+
+// The oldest election is the "primary" — everything not explicitly scoped to
+// another election (the main "/" site, the admin's default view) maps to it, so
+// a second election's data never leaks into the primary one.
+async function primaryElectionId(): Promise<string | null> {
+  if (_primaryId !== undefined) return _primaryId
+  const { data } = await supabase.from("elections").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle()
+  _primaryId = data?.id ?? null
+  return _primaryId
+}
+
+export function getCurrentElectionId(): string | null {
+  try { return localStorage.getItem(ELECTION_KEY) } catch { return null }
+}
+export function setCurrentElectionId(id: string | null) {
+  try { id ? localStorage.setItem(ELECTION_KEY, id) : localStorage.removeItem(ELECTION_KEY) } catch { /* ignore */ }
+}
+
+// Returns the election_id to scope a query/insert to, or null when scoping is off
+// (i.e. before the multi-election migration is applied → single-election behaviour).
+async function activeScope(explicit?: string | null): Promise<string | null> {
+  if (!(await scopingAvailable())) return null
+  const id = explicit ?? getCurrentElectionId()
+  return id || (await primaryElectionId())
+}
+
 // PostgREST returns at most ~1000 rows per request, so a plain .select("*")
 // silently truncates large tables (the votes table in particular). This pages
 // through every row with .range(). Rows are pulled oldest-first so that votes
 // being inserted during live polling only ever extend the final page (stable
 // pagination — no skipped or duplicated rows), then reversed to preserve the
-// previous newest-first ordering callers saw.
+// previous newest-first ordering callers saw. Optionally scoped to an election.
 const PAGE_SIZE = 1000
-async function fetchAllRows<T>(table: string): Promise<T[]> {
+async function fetchAllRows<T>(table: string, electionId?: string | null): Promise<T[]> {
   const all: T[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
+    let q = supabase.from(table).select("*")
+    if (electionId) q = q.eq("election_id", electionId)
+    const { data, error } = await q
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1)
@@ -27,6 +68,68 @@ async function fetchAllRows<T>(table: string): Promise<T[]> {
   }
   all.reverse()
   return all
+}
+
+// ── Elections (multi-tenant) ──────────────────────────────────
+
+export interface Election {
+  id: string
+  slug: string
+  name: string
+  organization: string | null
+  status: string
+  term: string | null
+  created_at: string
+}
+
+export const slugify = (s: string) =>
+  s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "election"
+
+export const electionsDb = {
+  list: async (): Promise<Election[]> => {
+    if (!(await scopingAvailable())) return []
+    const { data, error } = await supabase.from("elections").select("*").order("created_at", { ascending: true })
+    if (error) { console.error("electionsDb.list:", error.message); return [] }
+    return (data ?? []) as Election[]
+  },
+  getBySlug: async (slug: string): Promise<Election | null> => {
+    const { data } = await supabase.from("elections").select("*").eq("slug", slug).maybeSingle()
+    return (data as Election) || null
+  },
+  getById: async (id: string): Promise<Election | null> => {
+    const { data } = await supabase.from("elections").select("*").eq("id", id).maybeSingle()
+    return (data as Election) || null
+  },
+  create: async (input: { name: string; organization?: string; term?: string; slug?: string }): Promise<Election | null> => {
+    const base = slugify(input.slug || input.name)
+    // ensure unique slug
+    let slug = base
+    for (let i = 2; ; i++) {
+      const existing = await supabase.from("elections").select("id").eq("slug", slug).maybeSingle()
+      if (!existing.data) break
+      slug = `${base}-${i}`
+    }
+    const { data, error } = await supabase
+      .from("elections")
+      .insert([{ name: input.name.trim(), organization: input.organization?.trim() || null, term: input.term?.trim() || null, slug, status: "active" }])
+      .select("*")
+      .single()
+    if (error) { console.error("electionsDb.create:", error.message); return null }
+    await auditDb.log("election.create", `Created election "${input.name}" (/e/${slug})`)
+    return data as Election
+  },
+  update: async (id: string, patch: Partial<Pick<Election, "name" | "organization" | "term" | "status">>): Promise<boolean> => {
+    const { error } = await supabase.from("elections").update(patch).eq("id", id)
+    if (error) { console.error("electionsDb.update:", error.message); return false }
+    await auditDb.log("election.update", `Updated election ${id}`)
+    return true
+  },
+  remove: async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from("elections").delete().eq("id", id)
+    if (error) { console.error("electionsDb.remove:", error.message); return false }
+    await auditDb.log("election.delete", `Deleted election ${id}`)
+    return true
+  },
 }
 
 // ── Audit log ─────────────────────────────────────────────────
@@ -76,7 +179,7 @@ export const auditDb = {
 // ── Users ─────────────────────────────────────────────────────
 
 export const userDb = {
-  getAll: async (): Promise<User[]> => fetchAllRows<User>("users"),
+  getAll: async (): Promise<User[]> => fetchAllRows<User>("users", await activeScope()),
 
   // Device / session lock: register an active voting session for a code. Returns
   // ok:false if the code already has a live session on another device (within the
@@ -153,7 +256,7 @@ export const userDb = {
 // ── Candidates ────────────────────────────────────────────────
 
 export const candidateDb = {
-  getAll: async (): Promise<Candidate[]> => fetchAllRows<Candidate>("candidates"),
+  getAll: async (): Promise<Candidate[]> => fetchAllRows<Candidate>("candidates", await activeScope()),
 
   getByPosition: async (positionId: string): Promise<Candidate[]> => {
     const { data, error } = await supabase
@@ -166,9 +269,10 @@ export const candidateDb = {
   },
 
   create: async (candidate: Omit<Candidate, "id" | "created_at" | "vote_count" | "is_approved">): Promise<Candidate | null> => {
+    const scope = await activeScope()
     const { data, error } = await supabase
       .from("candidates")
-      .insert([{ ...candidate, vote_count: 0, is_approved: true }])
+      .insert([{ ...candidate, vote_count: 0, is_approved: true, ...(scope ? { election_id: scope } : {}) }])
       .select()
       .single()
     if (error) { console.error("candidateDb.create:", error.message); return null }
@@ -193,7 +297,8 @@ export const candidateDb = {
   // Bulk create candidates (used by the CSV/Excel import on the candidates page).
   createBatch: async (rows: Array<Omit<Candidate, "id" | "created_at" | "vote_count" | "is_approved">>): Promise<number> => {
     if (rows.length === 0) return 0
-    const payload = rows.map((r) => ({ ...r, vote_count: 0, is_approved: true }))
+    const scope = await activeScope()
+    const payload = rows.map((r) => ({ ...r, vote_count: 0, is_approved: true, ...(scope ? { election_id: scope } : {}) }))
     const { data, error } = await supabase.from("candidates").insert(payload).select("id")
     if (error) { console.error("candidateDb.createBatch:", error.message); return 0 }
     const n = data?.length ?? 0
@@ -206,23 +311,27 @@ export const candidateDb = {
 
 export const positionDb = {
   getAll: async (): Promise<Position[]> => {
-    const { data, error } = await supabase.from("positions").select("*").order("display_order", { ascending: true })
+    const scope = await activeScope()
+    let q = supabase.from("positions").select("*")
+    if (scope) q = q.eq("election_id", scope)
+    const { data, error } = await q.order("display_order", { ascending: true })
     if (error) { console.error("positionDb.getAll:", error.message); return [] }
     return data ?? []
   },
 
   getActive: async (): Promise<Position[]> => {
-    const { data, error } = await supabase
-      .from("positions")
-      .select("*")
-      .eq("is_active", true)
-      .order("display_order", { ascending: true })
+    const scope = await activeScope()
+    let q = supabase.from("positions").select("*").eq("is_active", true)
+    if (scope) q = q.eq("election_id", scope)
+    const { data, error } = await q.order("display_order", { ascending: true })
     if (error) return []
     return data ?? []
   },
 
   create: async (position: Omit<Position, "id" | "created_at">): Promise<Position | null> => {
-    const { data, error } = await supabase.from("positions").insert([position]).select().single()
+    const scope = await activeScope()
+    const row = scope ? { ...position, election_id: scope } : position
+    const { data, error } = await supabase.from("positions").insert([row]).select().single()
     if (error) { console.error("positionDb.create:", error.message); return null }
     await auditDb.log("position.create", `Added position "${data.name}"`)
     return data
@@ -246,7 +355,7 @@ export const positionDb = {
 // ── Votes ─────────────────────────────────────────────────────
 
 export const voteDb = {
-  getAll: async (): Promise<Vote[]> => fetchAllRows<Vote>("votes"),
+  getAll: async (): Promise<Vote[]> => fetchAllRows<Vote>("votes", await activeScope()),
 
   createBatch: async (votes: Array<{ user_id: string; candidate_id: string | null; position_id: string; is_abstain?: boolean }>): Promise<boolean> => {
     let { error } = await supabase.from("votes").insert(votes)
@@ -293,10 +402,14 @@ export const voteDb = {
 
 // ── Positions with candidates (for voting ballot) ─────────────
 
-export async function getPositionsWithCandidates(): Promise<Array<Position & { candidates: Candidate[] }>> {
+export async function getPositionsWithCandidates(electionId?: string | null): Promise<Array<Position & { candidates: Candidate[] }>> {
+  const scope = await activeScope(electionId)
+  let posQ = supabase.from("positions").select("*").eq("is_active", true)
+  let candQ = supabase.from("candidates").select("*").eq("is_approved", true)
+  if (scope) { posQ = posQ.eq("election_id", scope); candQ = candQ.eq("election_id", scope) }
   const [{ data: positions, error: posErr }, { data: candidates, error: candErr }] = await Promise.all([
-    supabase.from("positions").select("*").eq("is_active", true).order("display_order", { ascending: true }),
-    supabase.from("candidates").select("*").eq("is_approved", true),
+    posQ.order("display_order", { ascending: true }),
+    candQ,
   ])
 
   if (posErr) { console.error("getPositionsWithCandidates positions:", posErr.message); return [] }
@@ -595,7 +708,8 @@ const randomCode = () => "VT" + Math.random().toString(36).substring(2, 8).toUpp
 
 export async function createAnonymousVoters(count: number, prefix = "Voter"): Promise<{ student_id: string; voting_code: string; full_name: string }[]> {
   const n = Math.min(1000, Math.max(1, Math.floor(count)))
-  // Avoid colliding with existing codes
+  const scope = await activeScope()
+  // Avoid colliding with existing codes (across all elections for safety)
   const existing = await fetchAllRows<User>("users")
   const usedCodes = new Set(existing.map((u) => u.voting_code))
   const usedIds = new Set(existing.map((u) => u.student_id))
@@ -617,7 +731,8 @@ export async function createAnonymousVoters(count: number, prefix = "Voter"): Pr
       has_voted: false,
       is_anonymous: true,
       created_at: new Date().toISOString(),
-    })
+      ...(scope ? { election_id: scope } : {}),
+    } as any)
   }
 
   const { error } = await supabase.from("users").insert(rows)
