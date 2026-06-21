@@ -31,8 +31,9 @@ export const ROLE_HOME: Record<AdminRole, string> = {
 const ROLE_ROUTES: Record<AdminRole, string[]> = {
   // Administrator: full access to everything under /admin.
   admin: ["/admin"],
-  // Electoral commission chairperson: manages candidates & positions, views results.
+  // Electoral commission chairperson: manages voters, candidates & positions, views results.
   chairperson: [
+    "/admin/voters",
     "/admin/candidates",
     "/admin/positions",
     "/admin/results",
