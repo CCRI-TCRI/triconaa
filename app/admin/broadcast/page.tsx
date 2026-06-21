@@ -6,7 +6,7 @@ import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/l
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
-import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize, Volume2, VolumeX } from "lucide-react"
+import { Radio, ChevronLeft, ChevronRight, Pause, Play, Crown, BarChart3, Maximize, Minimize, Volume2, VolumeX, Sun, Moon } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 import { supabase } from "@/lib/supabase"
 
@@ -68,6 +68,10 @@ export default function BroadcastPage() {
   const [pageUrl, setPageUrl] = useState("")
   const [muted, setMuted] = useState(false)
   const [classTurnout, setClassTurnout] = useState<{ cls: string; voted: number; total: number; pct: number }[]>([])
+  const [light, setLight] = useState(false)
+
+  useEffect(() => { setLight(localStorage.getItem("broadcast-light") === "1") }, [])
+  const toggleLight = () => setLight((v) => { const n = !v; localStorage.setItem("broadcast-light", n ? "1" : "0"); return n })
 
   useEffect(() => {
     if (typeof window !== "undefined") setPageUrl(window.location.href)
@@ -242,16 +246,39 @@ export default function BroadcastPage() {
     }),
   ]
 
+  // Per-page theme — broadcast defaults to the dark studio look; light mode for
+  // bright halls / daytime projection. Accent colours (red, gold, blue) stay.
+  const T = {
+    root: light ? "bg-slate-100 text-slate-900" : "bg-[#070b14] text-white",
+    glow: light ? "opacity-25" : "opacity-70",
+    bar: light ? "border-slate-200 bg-white/90" : "border-white/10 bg-black/40",
+    muted: light ? "text-slate-500" : "text-white/50",
+    faint: light ? "text-slate-400" : "text-white/40",
+    kpiStrip: light ? "border-slate-200 bg-slate-200/50" : "border-white/10 bg-white/5",
+    kpiTile: light ? "bg-white" : "bg-black/30",
+    card: light ? "border-slate-200 bg-white shadow-sm" : "border-white/10 bg-white/[0.04]",
+    leaderCard: light ? "border-[#e11d2a]/40 bg-[#e11d2a]/5 shadow-sm" : "border-[#e11d2a]/60 bg-[#e11d2a]/10 shadow-lg shadow-[#e11d2a]/10",
+    track: light ? "bg-slate-200" : "bg-white/10",
+    ctrlBtn: light ? "text-slate-500 hover:bg-slate-200 hover:text-slate-900" : "text-white/60 hover:bg-white/10 hover:text-white",
+    name: light ? "text-slate-900" : "text-white",
+    dim: light ? "text-slate-400" : "text-white/30",
+    leaderText: "text-[#e11d2a]",
+    dot: light ? "bg-slate-300 hover:bg-slate-400" : "bg-white/20 hover:bg-white/40",
+    leaderAccent: light ? "text-[#e11d2a]" : "text-[#f5c542]",
+    ring: light ? "ring-slate-200" : "ring-white/15",
+    avatarFallback: light ? "bg-slate-100 text-[#e11d2a]" : "bg-white/5 text-[#f5c542]",
+    strong: light ? "text-slate-700" : "text-white/80",
+  }
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#070b14] text-white">
+    <div className={`fixed inset-0 z-[60] flex flex-col overflow-hidden ${T.root}`}>
       {/* studio glow */}
-      <div className="pointer-events-none absolute inset-0 opacity-70">
+      <div className={`pointer-events-none absolute inset-0 ${T.glow}`}>
         <div className="absolute -left-40 -top-40 h-[480px] w-[480px] rounded-full bg-[#e11d2a]/15 blur-[120px]" />
         <div className="absolute -right-40 top-1/3 h-[420px] w-[420px] rounded-full bg-[#1d4ed8]/15 blur-[120px]" />
       </div>
 
       {/* ── Top bar ───────────────────────────────────────────── */}
-      <header className="relative z-10 flex flex-none items-center justify-between gap-3 border-b border-white/10 bg-black/40 px-4 py-3 backdrop-blur sm:px-7">
+      <header className={`relative z-10 flex flex-none items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur sm:px-7 ${T.bar}`}>
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-full bg-[#ffffff] shadow ring-2 ring-[#f5c542]/50">
             <img src={logoUrl} alt={schoolName} className="h-8 w-8 object-contain" />
@@ -268,8 +295,8 @@ export default function BroadcastPage() {
               <span className="text-[9px] font-black uppercase leading-none tracking-wider text-[#070b14]">Watch<br />live</span>
             </div>
           )}
-          <span className="hidden font-mono text-sm text-white/50 sm:inline">{clock}</span>
-          <div className="flex items-center gap-2 rounded-md bg-[#e11d2a] px-3 py-1.5 shadow-lg shadow-[#e11d2a]/30">
+          <span className={`hidden font-mono text-sm sm:inline ${T.muted}`}>{clock}</span>
+          <div className="flex items-center gap-2 rounded-md bg-[#e11d2a] px-3 py-1.5 text-white shadow-lg shadow-[#e11d2a]/30">
             <motion.span animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.3, repeat: Infinity }}>
               <Radio className="h-4 w-4" />
             </motion.span>
@@ -283,21 +310,21 @@ export default function BroadcastPage() {
         <div className="flex items-center bg-black px-3 text-xs font-black uppercase tracking-widest text-[#f5c542] sm:px-4">
           {completed ? "Final" : "Breaking"}
         </div>
-        <div className="flex flex-1 items-center gap-2 px-4 py-1.5 text-sm font-bold uppercase tracking-wide">
+        <div className="flex flex-1 items-center gap-2 px-4 py-1.5 text-sm font-bold uppercase tracking-wide text-white">
           <span className="truncate">Election Night Coverage · "{motto}"</span>
         </div>
       </div>
 
       {/* ── KPI strip ─────────────────────────────────────────── */}
-      <div className="relative z-10 grid flex-none grid-cols-3 gap-px border-b border-white/10 bg-white/5 text-center">
+      <div className={`relative z-10 grid flex-none grid-cols-3 gap-px border-b text-center ${T.kpiStrip}`}>
         {[
           { label: "Votes Counted", node: <Rolling value={stats.totalVotes} /> },
           { label: "Turnout", node: <Pct value={stats.turnout} /> },
           { label: "Positions", node: <span className="tabular-nums">{races.length}</span> },
         ].map((k) => (
-          <div key={k.label} className="bg-black/30 px-3 py-2">
+          <div key={k.label} className={`px-3 py-2 ${T.kpiTile}`}>
             <p className="text-2xl font-black sm:text-3xl">{k.node}</p>
-            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40 sm:text-[10px]">{k.label}</p>
+            <p className={`text-[9px] font-bold uppercase tracking-[0.25em] sm:text-[10px] ${T.faint}`}>{k.label}</p>
           </div>
         ))}
       </div>
@@ -322,12 +349,12 @@ export default function BroadcastPage() {
                   </div>
                   <div className="flex-none text-right">
                     <p className="text-3xl font-black sm:text-5xl"><Pct value={stats.turnout} /></p>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40 sm:text-[10px]">{stats.votedCount.toLocaleString()} / {stats.totalVoters.toLocaleString()}</p>
+                    <p className={`text-[9px] font-bold uppercase tracking-[0.25em] sm:text-[10px] ${T.faint}`}>{stats.votedCount.toLocaleString()} / {stats.totalVoters.toLocaleString()}</p>
                   </div>
                 </div>
                 {/* Thermometer */}
                 <div className="mb-5 flex-none">
-                  <div className="h-7 w-full overflow-hidden rounded-full bg-white/10 ring-1 ring-white/10">
+                  <div className={`h-7 w-full overflow-hidden rounded-full ${T.track}`}>
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${Math.min(100, stats.turnout)}%` }}
@@ -341,16 +368,16 @@ export default function BroadcastPage() {
                 {/* Class leaderboard */}
                 <p className="mb-2 flex-none text-[11px] font-black uppercase tracking-[0.3em] text-[#f5c542]">Turnout by class</p>
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                  {classTurnout.length === 0 && <div className="flex h-full items-center justify-center text-sm text-white/40">No class data yet.</div>}
+                  {classTurnout.length === 0 && <div className={`flex h-full items-center justify-center text-sm ${T.faint}`}>No class data yet.</div>}
                   {classTurnout.map((c, i) => (
-                    <div key={c.cls} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 sm:px-4 ${i === 0 ? "border-[#f5c542]/60 bg-[#f5c542]/10" : "border-white/10 bg-white/[0.04]"}`}>
-                      <span className={`w-5 text-center text-lg font-black ${i === 0 ? "text-[#f5c542]" : "text-white/30"}`}>{i + 1}</span>
+                    <div key={c.cls} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 sm:px-4 ${i === 0 ? (light ? "border-[#e11d2a]/40 bg-[#e11d2a]/5" : "border-[#f5c542]/60 bg-[#f5c542]/10") : T.card}`}>
+                      <span className={`w-5 text-center text-lg font-black ${i === 0 ? T.leaderAccent : T.dim}`}>{i + 1}</span>
                       <span className="w-16 flex-none font-black uppercase">{c.cls}</span>
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                      <div className={`h-2.5 flex-1 overflow-hidden rounded-full ${T.track}`}>
                         <motion.div initial={{ width: 0 }} animate={{ width: `${c.pct}%` }} transition={{ duration: 1, ease: "easeOut" }} className="h-full rounded-full" style={{ background: i === 0 ? "linear-gradient(90deg,#e11d2a,#f5c542)" : "linear-gradient(90deg,#3b82f6,#60a5fa)" }} />
                       </div>
-                      <span className={`w-12 flex-none text-right text-lg font-black tabular-nums ${i === 0 ? "text-[#f5c542]" : "text-white/80"}`}>{c.pct.toFixed(0)}%</span>
-                      <span className="w-16 flex-none text-right text-[11px] text-white/40">{c.voted}/{c.total}</span>
+                      <span className={`w-12 flex-none text-right text-lg font-black tabular-nums ${i === 0 ? T.leaderAccent : T.strong}`}>{c.pct.toFixed(0)}%</span>
+                      <span className={`w-16 flex-none text-right text-[11px] ${T.faint}`}>{c.voted}/{c.total}</span>
                     </div>
                   ))}
                 </div>
@@ -364,8 +391,8 @@ export default function BroadcastPage() {
                 <h2 className="truncate text-3xl font-black uppercase leading-none tracking-tight sm:text-5xl">{race.name}</h2>
               </div>
               <div className="flex-none text-right">
-                <p className="text-3xl font-black text-white sm:text-5xl"><Rolling value={race.total} /></p>
-                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-white/40 sm:text-[10px]">Votes Cast</p>
+                <p className={`text-3xl font-black sm:text-5xl ${T.name}`}><Rolling value={race.total} /></p>
+                <p className={`text-[9px] font-bold uppercase tracking-[0.25em] sm:text-[10px] ${T.faint}`}>Votes Cast</p>
               </div>
             </div>
 
@@ -381,16 +408,16 @@ export default function BroadcastPage() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.07 }}
                     className={`relative flex items-center gap-3 overflow-hidden rounded-xl border px-3 py-2.5 sm:gap-4 sm:px-4 sm:py-3 ${
-                      isLeader ? "border-[#e11d2a]/60 bg-[#e11d2a]/10 shadow-lg shadow-[#e11d2a]/10" : "border-white/10 bg-white/[0.04]"
+                      isLeader ? T.leaderCard : T.card
                     }`}
                   >
-                    <span className={`w-5 text-center text-lg font-black sm:text-xl ${isLeader ? "text-[#f5c542]" : "text-white/30"}`}>{i + 1}</span>
-                    <div className={`h-12 w-12 flex-none overflow-hidden rounded-full ring-2 sm:h-14 sm:w-14 ${isLeader ? "ring-[#f5c542]" : "ring-white/15"}`}>
+                    <span className={`w-5 text-center text-lg font-black sm:text-xl ${isLeader ? T.leaderAccent : T.dim}`}>{i + 1}</span>
+                    <div className={`h-12 w-12 flex-none overflow-hidden rounded-full ring-2 sm:h-14 sm:w-14 ${isLeader ? "ring-[#f5c542]" : T.ring}`}>
                       {c.photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={c.photo_url} alt={c.full_name} className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-white/5 text-base font-black text-[#f5c542]">{initials(c.full_name)}</div>
+                        <div className={`flex h-full w-full items-center justify-center text-base font-black ${T.avatarFallback}`}>{initials(c.full_name)}</div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -403,11 +430,11 @@ export default function BroadcastPage() {
                             </span>
                           )}
                         </div>
-                        <span className={`flex-none text-xl font-black tabular-nums sm:text-2xl ${isLeader ? "text-[#f5c542]" : "text-white/80"}`}>
+                        <span className={`flex-none text-xl font-black tabular-nums sm:text-2xl ${isLeader ? T.leaderAccent : T.strong}`}>
                           <Pct value={pct} />
                         </span>
                       </div>
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div className={`h-2.5 w-full overflow-hidden rounded-full ${T.track}`}>
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${pct}%` }}
@@ -425,7 +452,7 @@ export default function BroadcastPage() {
                 )
               })}
               {race.candidates.length === 0 && (
-                <div className="flex h-full items-center justify-center text-sm text-white/40">No candidates for this position.</div>
+                <div className={`flex h-full items-center justify-center text-sm ${T.faint}`}>No candidates for this position.</div>
               )}
             </div>
             </>
@@ -435,17 +462,20 @@ export default function BroadcastPage() {
       </div>
 
       {/* ── Controls + position dots ──────────────────────────── */}
-      <div className="relative z-10 flex flex-none items-center justify-between gap-3 border-t border-white/10 bg-black/40 px-4 py-2 sm:px-7">
+      <div className={`relative z-10 flex flex-none items-center justify-between gap-3 border-t px-4 py-2 sm:px-7 ${T.bar}`}>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => go(-1)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Previous"><ChevronLeft className="h-5 w-5" /></button>
-          <button onClick={() => setPaused((p) => !p)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={paused ? "Play" : "Pause"}>
+          <button onClick={() => go(-1)} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label="Previous"><ChevronLeft className="h-5 w-5" /></button>
+          <button onClick={() => setPaused((p) => !p)} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label={paused ? "Play" : "Pause"}>
             {paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
           </button>
-          <button onClick={() => go(1)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label="Next"><ChevronRight className="h-5 w-5" /></button>
-          <button onClick={() => setMuted((m) => !m)} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={muted ? "Unmute" : "Mute"}>
+          <button onClick={() => go(1)} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label="Next"><ChevronRight className="h-5 w-5" /></button>
+          <button onClick={() => setMuted((m) => !m)} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label={muted ? "Unmute" : "Mute"}>
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </button>
-          <button onClick={toggleFullscreen} className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white" aria-label={isFs ? "Exit fullscreen" : "Fullscreen"}>
+          <button onClick={toggleLight} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label={light ? "Dark mode" : "Light mode"}>
+            {light ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          </button>
+          <button onClick={toggleFullscreen} className={`rounded-md p-1.5 ${T.ctrlBtn}`} aria-label={isFs ? "Exit fullscreen" : "Fullscreen"}>
             {isFs ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
           </button>
         </div>
@@ -454,12 +484,12 @@ export default function BroadcastPage() {
             <button
               key={i}
               onClick={() => setIndex(i)}
-              className={`h-1.5 rounded-full transition-all ${i === index ? "w-7 bg-[#e11d2a]" : "w-1.5 bg-white/20 hover:bg-white/40"} ${i === races.length ? "bg-[#f5c542]/60" : ""}`}
+              className={`h-1.5 rounded-full transition-all ${i === index ? "w-7 bg-[#e11d2a]" : `w-1.5 ${T.dot}`} ${i === races.length && i !== index ? "bg-[#f5c542]/60" : ""}`}
               aria-label={i === races.length ? "Turnout slide" : `Go to position ${i + 1}`}
             />
           ))}
         </div>
-        <p className="flex-none text-[11px] font-bold uppercase tracking-widest text-white/40">
+        <p className={`flex-none text-[11px] font-bold uppercase tracking-widest ${T.faint}`}>
           {index + 1} / {slides}{paused ? " · paused" : ""}
         </p>
       </div>
