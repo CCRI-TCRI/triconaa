@@ -8,7 +8,7 @@ import {
   Sparkles, TrendingUp, TrendingDown, Eye, Percent, Award, Plus, Download,
   Calendar, ChevronDown, Send, X, Star, BarChart3, PieChart as PieIcon, LineChart as LineIcon, Layers,
 } from "lucide-react"
-import { userDb, candidateDb, voteDb, positionDb, electionControl, type ElectionStatus } from "@/lib/db"
+import { userDb, candidateDb, voteDb, positionDb, electionControl, electionsDb, getCurrentElectionId, setCurrentElectionId, type ElectionStatus, type Election } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { extractLogoColor } from "@/lib/pdf-logo-color"
 import { toast } from "sonner"
@@ -197,6 +197,20 @@ export default function AdminDashboard() {
     const t = setInterval(load, 15000)
     return () => clearInterval(t)
   }, [])
+
+  // Election switcher (which election the dashboard reflects)
+  const [elections, setElections] = useState<Election[]>([])
+  const [electionId, setElectionId] = useState<string | null>(null)
+  useEffect(() => {
+    (async () => { setElections(await electionsDb.list()); setElectionId(getCurrentElectionId()) })()
+  }, [])
+  const switchElection = (id: string | null) => {
+    setCurrentElectionId(id)
+    setElectionId(id)
+    setLoading(true)
+    load()
+  }
+  const managedName = electionId ? elections.find((e) => e.id === electionId)?.name : null
 
   async function load() {
     try {
@@ -586,13 +600,27 @@ export default function AdminDashboard() {
         <div className="min-w-0">
           <h2 className="text-2xl font-bold text-slate-900">Dashboard</h2>
           <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span className="truncate">{schoolName}</span>
+            <span className="truncate">{managedName || schoolName}</span>
             <span className="text-slate-300">·</span>
             <span className="truncate">{electionTerm}</span>
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadge[status]}`}>{status}</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {elections.length > 0 && (
+            <div className="relative">
+              <select
+                value={electionId || ""}
+                onChange={(e) => switchElection(e.target.value || null)}
+                className="appearance-none rounded-lg border border-sky-200 bg-sky-50 py-2 pl-3 pr-8 text-sm font-medium text-sky-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                title="Which election this dashboard shows"
+              >
+                <option value="">All / primary</option>
+                {elections.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-sky-500" />
+            </div>
+          )}
           <span className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 sm:flex">
             <Calendar className="h-4 w-4 text-slate-400" /> {dateSpan}
           </span>
