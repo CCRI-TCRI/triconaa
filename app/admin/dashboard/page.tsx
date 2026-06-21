@@ -270,8 +270,11 @@ export default function AdminDashboard() {
     const byCategory = Object.entries(catMap).map(([name, value]) => ({ name, value })).filter((c) => c.value > 0).sort((a, b) => b.value - a.value)
     const segments = byCategory.slice(0, 3)
 
-    // votes in selected window for time series
-    const vps = votes.filter((v) => (win ? inWin(v.created_at) : true))
+    // votes in selected window for time series — fall back to ALL votes when the
+    // window is empty (e.g. a short minute-window viewed after voting), so the
+    // charts, feeds, busiest-day and momentum always reflect real data.
+    const windowed = votes.filter((v) => (win ? inWin(v.created_at) : true))
+    const vps = windowed.length ? windowed : votes
     const sorted = [...vps].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at))
     let area: { label: string; votes: number }[] = []
     let volume: { label: string; votes: number }[] = []
@@ -658,8 +661,8 @@ export default function AdminDashboard() {
 
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Eye} label="Votes Cast" value={d.votesCur.toLocaleString()} deltaPct={win ? d.votesTrend : null} up={d.votesCur >= d.votesPrev} sub={win ? `vs ${d.votesPrev} last period` : `${d.votes} total ballots`} />
-        <StatCard icon={Users} label="Voters Turned Out" value={d.votedCur.toLocaleString()} deltaPct={win ? d.votedTrend : null} up={d.votedCur >= d.votedPrev} sub={win ? `vs ${d.votedPrev} last period` : `${d.voted} students voted`} />
+        <StatCard icon={Eye} label="Votes Cast" value={d.votes.toLocaleString()} deltaPct={win && d.votesCur > 0 ? d.votesTrend : null} up={d.votesCur >= d.votesPrev} sub={`${d.votes} total ballots`} />
+        <StatCard icon={Users} label="Voters Turned Out" value={d.voted.toLocaleString()} deltaPct={win && d.votedCur > 0 ? d.votedTrend : null} up={d.votedCur >= d.votedPrev} sub={`${d.voted} students voted`} />
         <StatCard icon={Percent} label="Turnout" value={`${d.turnout}%`} sub={`${d.voted} of ${d.voters} registered`} />
         <StatCard icon={Award} label="Candidates" value={d.candidates.toLocaleString()} sub={`across ${d.positions} positions`} />
       </div>
