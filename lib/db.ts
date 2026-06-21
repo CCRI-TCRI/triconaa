@@ -66,10 +66,15 @@ async function activeScope(explicit?: string | null): Promise<string | null> {
 // Apply an election filter to a query. The primary election also absorbs any
 // rows with a null election_id (legacy / not-yet-stamped data) so nothing is
 // ever hidden from the main election.
-async function applyScope(q: any, electionId: string | null): Promise<any> {
+// IMPORTANT: this is synchronous and returns the query builder directly. It must
+// NOT be async — returning a (thenable) PostgREST builder from an async function
+// causes `await` to execute the query early and yield the result instead of the
+// builder, which then breaks chained calls like .order().
+function scopeFilter(q: any, electionId: string | null, primaryId: string | null): any {
   if (!electionId) return q
-  const primary = await primaryElectionId()
-  return electionId === primary ? q.or(`election_id.eq.${electionId},election_id.is.null`) : q.eq("election_id", electionId)
+  return electionId === primaryId
+    ? q.or(`election_id.eq.${electionId},election_id.is.null`)
+    : q.eq("election_id", electionId)
 }
 
 // Public accessor for callers outside the data layer (e.g. the Voters page) that
@@ -87,9 +92,10 @@ export async function currentElectionScope(): Promise<string | null> {
 const PAGE_SIZE = 1000
 async function fetchAllRows<T>(table: string, electionId?: string | null): Promise<T[]> {
   const all: T[] = []
+  const primary = electionId ? await primaryElectionId() : null
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase.from(table).select("*")
-    q = await applyScope(q, electionId ?? null)
+    q = scopeFilter(q, electionId ?? null, primary)
     let { data, error } = await q
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
@@ -363,8 +369,9 @@ export const candidateDb = {
 export const positionDb = {
   getAll: async (): Promise<Position[]> => {
     const scope = await activeScope()
+    const primary = scope ? await primaryElectionId() : null
     let q = supabase.from("positions").select("*")
-    q = await applyScope(q, scope)
+    q = scopeFilter(q, scope, primary)
     let { data, error } = await q.order("display_order", { ascending: true })
     if (error && scope) {
       _scopeAvail = false
@@ -377,8 +384,9 @@ export const positionDb = {
 
   getActive: async (): Promise<Position[]> => {
     const scope = await activeScope()
+    const primary = scope ? await primaryElectionId() : null
     let q = supabase.from("positions").select("*").eq("is_active", true)
-    q = await applyScope(q, scope)
+    q = scopeFilter(q, scope, primary)
     let { data, error } = await q.order("display_order", { ascending: true })
     if (error && scope) {
       _scopeAvail = false
@@ -467,10 +475,11 @@ export const voteDb = {
 
 export async function getPositionsWithCandidates(electionId?: string | null): Promise<Array<Position & { candidates: Candidate[] }>> {
   const scope = await activeScope(electionId)
+  const primary = scope ? await primaryElectionId() : null
   let posQ = supabase.from("positions").select("*").eq("is_active", true)
   let candQ = supabase.from("candidates").select("*").eq("is_approved", true)
-  posQ = await applyScope(posQ, scope)
-  candQ = await applyScope(candQ, scope)
+  posQ = scopeFilter(posQ, scope, primary)
+  candQ = scopeFilter(candQ, scope, primary)
   let [{ data: positions, error: posErr }, { data: candidates, error: candErr }] = await Promise.all([
     posQ.order("display_order", { ascending: true }),
     candQ,
