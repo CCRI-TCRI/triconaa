@@ -49,6 +49,12 @@ const menuItems = [
     items: [
       {
         title: "Dashboard",
+        url: "/admin/commission",
+        icon: LayoutDashboard,
+        roles: ["chairperson"] as AdminRole[],
+      },
+      {
+        title: "Dashboard",
         url: "/admin/dashboard",
         icon: LayoutDashboard,
       },
@@ -168,9 +174,10 @@ export function AdminSidebar() {
     setName(getAdminName())
   }, [])
 
-  // Only show menu items the signed-in role may access.
+  // Only show menu items the signed-in role may access (and that aren't restricted
+  // to other roles).
   const groups = menuItems
-    .map((g) => ({ ...g, items: g.items.filter((it) => !role || roleCanAccess(role, it.url)) }))
+    .map((g) => ({ ...g, items: g.items.filter((it) => (!role || roleCanAccess(role, it.url)) && (!(it as any).roles || (role && (it as any).roles.includes(role)))) }))
     .filter((g) => g.items.length > 0)
 
   return (

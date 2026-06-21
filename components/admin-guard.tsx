@@ -24,7 +24,7 @@ const PUBLIC_ADMIN_ROUTES = [
 // Where each role lands after login, and which route prefixes they may access.
 export const ROLE_HOME: Record<AdminRole, string> = {
   admin: "/admin/dashboard",
-  chairperson: "/admin/candidates",
+  chairperson: "/admin/commission",
   headteacher: "/admin/dashboard",
 }
 
@@ -33,6 +33,7 @@ const ROLE_ROUTES: Record<AdminRole, string[]> = {
   admin: ["/admin"],
   // Electoral commission chairperson: manages voters, candidates & positions, views results.
   chairperson: [
+    "/admin/commission",
     "/admin/voters",
     "/admin/candidates",
     "/admin/positions",

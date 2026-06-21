@@ -431,71 +431,88 @@ export default function ResultsPage() {
         </Card>
       </div>
 
-      {/* Results grid */}
-      <div className="grid gap-5 xl:grid-cols-2">
-        {results.map((position, index) => (
-          <Card key={index} className="overflow-hidden border-slate-200">
-            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-emerald-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-sky-800">
-                    <Crown className="h-5 w-5 text-sky-600" />{position.position_name}
-                  </CardTitle>
-                  <CardDescription>{position.category} • {position.total_votes} votes cast</CardDescription>
-                </div>
-                <Badge variant="outline" className="border-sky-200 bg-white/60 text-sky-700">{position.candidates.length} candidates</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-5">
-              <div className="space-y-3">
-                {position.candidates.map((candidate, ci) => {
-                  const isWinner = ci === 0 && candidate.vote_count > 0
-                  return (
-                    <div
-                      key={candidate.id}
-                      className={`flex items-center gap-3 rounded-xl p-3 transition-colors ${
-                        isWinner ? "bg-emerald-50 ring-1 ring-emerald-200" : "bg-slate-50/60 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex w-7 items-center justify-center">
-                        {isWinner ? <Trophy className="h-5 w-5 text-amber-500" /> : <span className="text-sm font-semibold text-slate-400">#{ci + 1}</span>}
-                      </div>
-                      <Avatar className={`h-11 w-11 ${isWinner ? "ring-2 ring-emerald-400" : "ring-1 ring-slate-200"}`}>
-                        <AvatarImage src={candidate.photo_url || "/placeholder.svg"} alt={candidate.full_name} />
-                        <AvatarFallback className={isWinner ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}>
-                          {candidate.full_name.split(" ").map((n) => n[0]).join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-semibold text-slate-800">{candidate.full_name}</p>
-                          {candidate.class && <span className="text-xs text-slate-400">{candidate.class}</span>}
-                          {isWinner && <Badge className="bg-emerald-500 text-white hover:bg-emerald-500">Leading</Badge>}
-                        </div>
-                        <div className="mt-2 flex items-center gap-3">
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/70">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${isWinner ? "bg-emerald-500" : "bg-sky-400"}`}
-                              style={{ width: `${candidate.percentage}%` }}
-                            />
+      {/* Results grouped by category for orderliness */}
+      {(() => {
+        const order: string[] = []
+        const groups: Record<string, ResultData[]> = {}
+        results.forEach((r) => {
+          const cat = r.category || "Other"
+          if (!groups[cat]) { groups[cat] = []; order.push(cat) }
+          groups[cat].push(r)
+        })
+        return order.map((cat) => (
+          <section key={cat} className="space-y-3">
+            {/* Category divider */}
+            <div className="flex items-center gap-3">
+              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{cat}</h2>
+              <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
+                {groups[cat].length} {groups[cat].length === 1 ? "position" : "positions"}
+              </span>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              {groups[cat].map((position, index) => {
+                const unopposed = position.candidates.length === 1
+                return (
+                  <Card key={index} className="overflow-hidden border-slate-200 dark:border-white/10">
+                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b border-slate-100 py-3 dark:border-white/10">
+                      <CardTitle className="truncate text-base font-bold text-slate-800 dark:text-slate-100">{position.position_name}</CardTitle>
+                      <span className="flex-none rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                        {position.total_votes} {position.total_votes === 1 ? "vote" : "votes"}
+                      </span>
+                    </CardHeader>
+                    <CardContent className="space-y-2 p-3">
+                      {position.candidates.map((candidate, ci) => {
+                        const isWinner = ci === 0 && candidate.vote_count > 0
+                        return (
+                          <div
+                            key={candidate.id}
+                            className={`flex items-center gap-3 rounded-lg px-2.5 py-2 ${
+                              isWinner ? "bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-500/30" : ""
+                            }`}
+                          >
+                            <div className="w-5 flex-none text-center">
+                              {isWinner ? <Crown className="mx-auto h-4 w-4 text-amber-500" /> : <span className="text-xs font-bold text-slate-300">{ci + 1}</span>}
+                            </div>
+                            <Avatar className={`h-9 w-9 flex-none ${isWinner ? "ring-2 ring-emerald-400" : "ring-1 ring-slate-200 dark:ring-white/10"}`}>
+                              <AvatarImage src={candidate.photo_url || "/placeholder.svg"} alt={candidate.full_name} />
+                              <AvatarFallback className={isWinner ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}>
+                                {candidate.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{candidate.full_name}</p>
+                                {candidate.class && <span className="flex-none text-[11px] text-slate-400">{candidate.class}</span>}
+                                {isWinner && !unopposed && <span className="flex-none rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white">LEADING</span>}
+                                {unopposed && <span className="flex-none rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">UNOPPOSED</span>}
+                              </div>
+                              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/70 dark:bg-white/10">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${isWinner ? "bg-emerald-500" : "bg-sky-400"}`}
+                                  style={{ width: `${candidate.percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                            <div className="w-14 flex-none text-right">
+                              <p className="text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">{candidate.percentage.toFixed(0)}%</p>
+                              <p className="text-[11px] tabular-nums text-slate-400">{candidate.vote_count}</p>
+                            </div>
                           </div>
-                          <div className="min-w-[74px] text-right">
-                            <p className="text-sm font-bold text-slate-800">{candidate.vote_count} <span className="font-normal text-slate-400">votes</span></p>
-                            <p className="text-xs text-slate-500">{candidate.percentage.toFixed(1)}%</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-                {position.candidates.length === 0 && (
-                  <p className="py-4 text-center text-sm text-muted-foreground">No candidates registered for this position</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                        )
+                      })}
+                      {position.candidates.length === 0 && (
+                        <p className="py-3 text-center text-sm text-muted-foreground">No candidates for this position</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+        ))
+      })()}
 
       {results.length === 0 && (
         <Card className="border-slate-200">
