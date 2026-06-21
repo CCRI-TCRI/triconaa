@@ -19,7 +19,7 @@ import { toast } from "@/hooks/use-toast"
 import { candidateDb, positionDb } from "@/lib/db"
 import type { Candidate, Position } from "@/lib/db"
 import { supabase } from "@/lib/supabase"
-import { UserPlus, Trash2, Edit, RefreshCw, Search, Upload } from "lucide-react"
+import { UserPlus, Trash2, Edit, RefreshCw, Search, Upload, Image as ImageIcon, Camera, X, Check, Loader2 } from "lucide-react"
 
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
@@ -36,6 +36,22 @@ export default function CandidatesPage() {
   })
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showImport, setShowImport] = useState(false)
+  const [photoMode, setPhotoMode] = useState(false)
+  const [onlyMissing, setOnlyMissing] = useState(false)
+  const [photoSavingId, setPhotoSavingId] = useState<string | null>(null)
+
+  // Save (or clear) a candidate's photo directly from the photo manager.
+  const savePhoto = async (candidate: Candidate, photo_url: string) => {
+    setPhotoSavingId(candidate.id)
+    const updated = await candidateDb.update(candidate.id, { photo_url })
+    setPhotoSavingId(null)
+    if (updated) {
+      setCandidates((prev) => prev.map((c) => (c.id === updated.id ? updated : c)))
+      toast({ title: photo_url ? "Photo updated" : "Photo removed", description: candidate.full_name })
+    } else {
+      toast({ title: "Error", description: "Could not save the photo.", variant: "destructive" })
+    }
+  }
   const [importRows, setImportRows] = useState<{ full_name: string; class: string; position_id: string; positionName: string; manifesto: string; photo_url: string; valid: boolean; note?: string }[]>([])
   const [importing, setImporting] = useState(false)
 
@@ -316,6 +332,7 @@ export default function CandidatesPage() {
         </div>
         <div className="flex gap-2">
           <Button onClick={fetchData} variant="outline"><RefreshCw className="w-4 h-4 mr-2" />Refresh</Button>
+          <Button onClick={() => setPhotoMode((v) => !v)} variant={photoMode ? "default" : "outline"} className="gap-2"><ImageIcon className="w-4 h-4" />{photoMode ? "Done" : "Manage Photos"}</Button>
           <Dialog open={showImport} onOpenChange={(o) => { setShowImport(o); if (!o) setImportRows([]) }}>
             <DialogTrigger asChild>
               <Button variant="outline" disabled={positions.length === 0}><Upload className="w-4 h-4 mr-2" />Bulk Import</Button>
@@ -419,6 +436,77 @@ export default function CandidatesPage() {
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Active Positions</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{positions.length}</div></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Approved</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">{candidates.filter((c) => c.is_approved).length}</div></CardContent></Card>
       </div>
+
+      {/* ── Photo manager ───────────────────────────────────────── */}
+      {photoMode && (() => {
+        const hasPhoto = (c: Candidate) => !!(c.photo_url && c.photo_url.trim())
+        const withPhoto = candidates.filter(hasPhoto).length
+        const list = filtered.filter((c) => (onlyMissing ? !hasPhoto(c) : true))
+        return (
+          <Card className="border-sky-200 dark:border-sky-500/30">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Camera className="h-5 w-5 text-sky-600" />Candidate Photos</CardTitle>
+                  <CardDescription>
+                    {withPhoto} of {candidates.length} have photos · {candidates.length - withPhoto} missing. Tap a card to upload (JPG/PNG/CR2).
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant={onlyMissing ? "default" : "outline"} onClick={() => setOnlyMissing((v) => !v)}>
+                  {onlyMissing ? "Showing missing only" : "Show only missing"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {list.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  {onlyMissing ? "Every candidate (in this filter) has a photo. 🎉" : "No candidates match the current filter."}
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {list.map((c) => {
+                    const photo = hasPhoto(c)
+                    const saving = photoSavingId === c.id
+                    return (
+                      <div key={c.id} className="overflow-hidden rounded-xl border bg-card dark:border-white/10">
+                        <label className="group relative block aspect-square cursor-pointer">
+                          {photo ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.photo_url} alt={c.full_name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-100 text-slate-400 dark:bg-white/5">
+                              <ImageIcon className="h-7 w-7" />
+                              <span className="text-[10px] font-medium">No photo</span>
+                            </div>
+                          )}
+                          {/* hover/upload overlay */}
+                          <div className={`absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 text-white transition-opacity ${photo ? "opacity-0 group-hover:opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                            {saving ? <Loader2 className="h-6 w-6 animate-spin" /> : <><Upload className="h-6 w-6" /><span className="text-xs font-semibold">{photo ? "Replace" : "Upload"}</span></>}
+                          </div>
+                          {photo && !saving && (
+                            <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white"><Check className="h-3 w-3" /></span>
+                          )}
+                          <input type="file" accept="image/*,.cr2,image/x-canon-cr2" className="hidden" disabled={saving}
+                            onChange={(e) => handlePhoto(e.target.files?.[0], (url) => savePhoto(c, url))} />
+                        </label>
+                        <div className="p-2">
+                          <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{c.full_name}</p>
+                          <p className="truncate text-[11px] text-muted-foreground">{getPositionName(c.position_id)}</p>
+                          {photo && (
+                            <button onClick={() => savePhoto(c, "")} disabled={saving} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:underline disabled:opacity-50">
+                              <X className="h-3 w-3" /> Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       <Card>
         <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
