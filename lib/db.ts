@@ -12,6 +12,7 @@ export type { User, Candidate, Position, Vote }
 const ELECTION_KEY = "tricona_election_id"
 let _scopeAvail: boolean | null = null
 let _primaryId: string | null | undefined = undefined
+let _validIds: Set<string> | null = null
 
 export async function scopingAvailable(): Promise<boolean> {
   if (_scopeAvail !== null) return _scopeAvail
@@ -23,6 +24,15 @@ export async function scopingAvailable(): Promise<boolean> {
   const col = await supabase.from("votes").select("election_id").limit(1)
   _scopeAvail = !col.error
   return _scopeAvail
+}
+
+// Set of valid election ids — used to ignore stale/deleted ids saved in the
+// browser (which would otherwise scope reads to a non-existent election → empty).
+async function validElectionIds(): Promise<Set<string>> {
+  if (_validIds) return _validIds
+  const { data } = await supabase.from("elections").select("id")
+  _validIds = new Set((data ?? []).map((r: any) => r.id))
+  return _validIds
 }
 
 // The oldest election is the "primary" — everything not explicitly scoped to
@@ -46,11 +56,11 @@ export function setCurrentElectionId(id: string | null) {
 // (i.e. before the multi-election migration is applied → single-election behaviour).
 async function activeScope(explicit?: string | null): Promise<string | null> {
   if (!(await scopingAvailable())) return null
-  // Only scope when an election is explicitly chosen (admin switcher) or set as
-  // the current context (e.g. an /e/[slug] voter page). With nothing selected we
-  // show ALL data — so the admin's "All" view never appears empty regardless of
-  // how rows are tagged.
-  return (explicit ?? getCurrentElectionId()) || null
+  const id = (explicit ?? getCurrentElectionId()) || null
+  if (!id) return null
+  // Ignore stale/deleted election ids so reads are never scoped to nothing.
+  const ids = await validElectionIds()
+  return ids.has(id) ? id : null
 }
 
 // Apply an election filter to a query. The primary election also absorbs any

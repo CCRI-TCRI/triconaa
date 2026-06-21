@@ -202,7 +202,14 @@ export default function AdminDashboard() {
   const [elections, setElections] = useState<Election[]>([])
   const [electionId, setElectionId] = useState<string | null>(null)
   useEffect(() => {
-    (async () => { setElections(await electionsDb.list()); setElectionId(getCurrentElectionId()) })()
+    (async () => {
+      const els = await electionsDb.list()
+      setElections(els)
+      const cur = getCurrentElectionId()
+      // Drop a stale/deleted election id so the dashboard defaults to "All".
+      if (cur && !els.some((e) => e.id === cur)) { setCurrentElectionId(null); setElectionId(null) }
+      else setElectionId(cur)
+    })()
   }, [])
   const switchElection = (id: string | null) => {
     setCurrentElectionId(id)
