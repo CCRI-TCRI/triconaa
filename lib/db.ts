@@ -45,6 +45,15 @@ async function activeScope(explicit?: string | null): Promise<string | null> {
   return id || (await primaryElectionId())
 }
 
+// Apply an election filter to a query. The primary election also absorbs any
+// rows with a null election_id (legacy / not-yet-stamped data) so nothing is
+// ever hidden from the main election.
+async function applyScope(q: any, electionId: string | null): Promise<any> {
+  if (!electionId) return q
+  const primary = await primaryElectionId()
+  return electionId === primary ? q.or(`election_id.eq.${electionId},election_id.is.null`) : q.eq("election_id", electionId)
+}
+
 // Public accessor for callers outside the data layer (e.g. the Voters page) that
 // need to stamp the current election on their own inserts.
 export async function currentElectionScope(): Promise<string | null> {
@@ -62,7 +71,7 @@ async function fetchAllRows<T>(table: string, electionId?: string | null): Promi
   const all: T[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase.from(table).select("*")
-    if (electionId) q = q.eq("election_id", electionId)
+    q = await applyScope(q, electionId ?? null)
     const { data, error } = await q
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
@@ -325,18 +334,16 @@ export const candidateDb = {
 
 export const positionDb = {
   getAll: async (): Promise<Position[]> => {
-    const scope = await activeScope()
     let q = supabase.from("positions").select("*")
-    if (scope) q = q.eq("election_id", scope)
+    q = await applyScope(q, await activeScope())
     const { data, error } = await q.order("display_order", { ascending: true })
     if (error) { console.error("positionDb.getAll:", error.message); return [] }
     return data ?? []
   },
 
   getActive: async (): Promise<Position[]> => {
-    const scope = await activeScope()
     let q = supabase.from("positions").select("*").eq("is_active", true)
-    if (scope) q = q.eq("election_id", scope)
+    q = await applyScope(q, await activeScope())
     const { data, error } = await q.order("display_order", { ascending: true })
     if (error) return []
     return data ?? []
@@ -372,11 +379,13 @@ export const voteDb = {
   getAll: async (): Promise<Vote[]> => fetchAllRows<Vote>("votes", await activeScope()),
 
   createBatch: async (votes: Array<{ user_id: string; candidate_id: string | null; position_id: string; is_abstain?: boolean }>): Promise<boolean> => {
-    let { error } = await supabase.from("votes").insert(votes)
+    const scope = await activeScope()
+    const stamped = scope ? votes.map((v) => ({ ...v, election_id: scope })) : votes
+    let { error } = await supabase.from("votes").insert(stamped)
     if (error) {
       // is_abstain column / nullable candidate_id may not exist yet — retry with
       // only real (non-abstain) selections stripped of the extra field.
-      const fallback = votes.filter((v) => v.candidate_id).map((v) => ({ user_id: v.user_id, candidate_id: v.candidate_id, position_id: v.position_id }))
+      const fallback = votes.filter((v) => v.candidate_id).map((v) => ({ user_id: v.user_id, candidate_id: v.candidate_id, position_id: v.position_id, ...(scope ? { election_id: scope } : {}) }))
       if (fallback.length === 0) return true
       const retry = await supabase.from("votes").insert(fallback)
       if (retry.error) { console.error("voteDb.createBatch:", retry.error.message); return false }
@@ -420,7 +429,8 @@ export async function getPositionsWithCandidates(electionId?: string | null): Pr
   const scope = await activeScope(electionId)
   let posQ = supabase.from("positions").select("*").eq("is_active", true)
   let candQ = supabase.from("candidates").select("*").eq("is_approved", true)
-  if (scope) { posQ = posQ.eq("election_id", scope); candQ = candQ.eq("election_id", scope) }
+  posQ = await applyScope(posQ, scope)
+  candQ = await applyScope(candQ, scope)
   const [{ data: positions, error: posErr }, { data: candidates, error: candErr }] = await Promise.all([
     posQ.order("display_order", { ascending: true }),
     candQ,
