@@ -31,6 +31,7 @@ interface PositionWithCandidates extends Position {
 interface VotingBallotProps {
   studentId: string
   onVoteComplete: (receipt?: string) => void
+  brand?: { schoolName?: string; motto?: string; logoUrl?: string }
 }
 
 const MAROON = "#168AAD"
@@ -191,8 +192,11 @@ function UnopposedList({ positions }: { positions: PositionWithCandidates[] }) {
   )
 }
 
-export function VotingBallot({ studentId, onVoteComplete }: VotingBallotProps) {
-  const { schoolName, motto, logoUrl } = useSchoolBranding()
+export function VotingBallot({ studentId, onVoteComplete, brand }: VotingBallotProps) {
+  const g = useSchoolBranding()
+  const schoolName = brand?.schoolName || g.schoolName
+  const motto = brand?.motto || g.motto
+  const logoUrl = brand?.logoUrl || g.logoUrl
   const [positions, setPositions] = useState<PositionWithCandidates[]>([])
   const [unopposedPositions, setUnopposedPositions] = useState<PositionWithCandidates[]>([])
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)

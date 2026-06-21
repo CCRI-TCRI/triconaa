@@ -85,8 +85,16 @@ export interface Election {
   organization: string | null
   status: string
   term: string | null
+  // Per-election login branding
+  motto: string | null
+  logo_url: string | null
+  login_subtitle: string | null
+  login_welcome: string | null
+  login_bg_images: string | null // JSON array of image URLs / data URLs
   created_at: string
 }
+
+export type ElectionBranding = Partial<Pick<Election, "name" | "organization" | "term" | "status" | "motto" | "logo_url" | "login_subtitle" | "login_welcome" | "login_bg_images">>
 
 export const slugify = (s: string) =>
   s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "election"
@@ -124,7 +132,7 @@ export const electionsDb = {
     await auditDb.log("election.create", `Created election "${input.name}" (/e/${slug})`)
     return data as Election
   },
-  update: async (id: string, patch: Partial<Pick<Election, "name" | "organization" | "term" | "status">>): Promise<boolean> => {
+  update: async (id: string, patch: ElectionBranding): Promise<boolean> => {
     const { error } = await supabase.from("elections").update(patch).eq("id", id)
     if (error) { console.error("electionsDb.update:", error.message); return false }
     await auditDb.log("election.update", `Updated election ${id}`)

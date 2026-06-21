@@ -21,6 +21,17 @@ export default function ElectionVotePage() {
   const [studentId, setStudentId] = useState("")
   const [receipt, setReceipt] = useState("")
 
+  // Per-election login branding (falls back to the global defaults)
+  const brand = election
+    ? {
+        schoolName: election.name,
+        logoUrl: election.logo_url || logoUrl,
+        subtitle: election.login_subtitle || undefined,
+        welcome: election.login_welcome || undefined,
+        bgImages: (() => { try { const a = JSON.parse(election.login_bg_images || "[]"); return Array.isArray(a) ? a : [] } catch { return [] } })(),
+      }
+    : undefined
+
   useEffect(() => {
     if (!slug) return
     (async () => {
@@ -67,13 +78,13 @@ export default function ElectionVotePage() {
     return (
       <div className="relative min-h-[100dvh]">
         <div className="bg-[#168AAD] py-2 text-center text-sm font-semibold text-white">{election?.name}</div>
-        <BiometricAuth onAuthSuccess={handleAuth} />
+        <BiometricAuth onAuthSuccess={handleAuth} brand={brand} />
       </div>
     )
   }
 
   if (state === "voting") {
-    return <VotingBallot studentId={studentId} onVoteComplete={(r) => { if (r) setReceipt(r); setState("complete") }} />
+    return <VotingBallot studentId={studentId} onVoteComplete={(r) => { if (r) setReceipt(r); setState("complete") }} brand={election ? { schoolName: election.name, motto: election.motto || undefined, logoUrl: election.logo_url || undefined } : undefined} />
   }
 
   // complete

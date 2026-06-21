@@ -11,9 +11,34 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Vote, Plus, Link2, Check, Layers, Trash2, Copy } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Vote, Plus, Link2, Check, Layers, Trash2, Copy, Palette, ImagePlus, X } from "lucide-react"
 import { electionsDb, getCurrentElectionId, setCurrentElectionId, scopingAvailable, type Election } from "@/lib/db"
 import { toast } from "sonner"
+
+// Resize an image file to a compact data URL for storage.
+const resizeImage = (file: File, max: number, mime = "image/jpeg", quality = 0.72): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new window.Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > height && width > max) { height = Math.round((height * max) / width); width = max }
+        else if (height > max) { width = Math.round((width * max) / height); height = max }
+        const canvas = document.createElement("canvas")
+        canvas.width = width; canvas.height = height
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return reject(new Error("no ctx"))
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL(mime, quality))
+      }
+      img.onerror = reject
+      img.src = reader.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 
 export default function ElectionsPage() {
   const [elections, setElections] = useState<Election[]>([])
@@ -24,6 +49,46 @@ export default function ElectionsPage() {
   const [form, setForm] = useState({ name: "", organization: "", term: "" })
   const [current, setCurrent] = useState<string | null>(null)
   const [origin, setOrigin] = useState("")
+
+  // Per-election branding editor
+  const [brandFor, setBrandFor] = useState<Election | null>(null)
+  const [brand, setBrand] = useState({ motto: "", logo_url: "", login_subtitle: "", login_welcome: "", images: [] as string[] })
+  const [brandSaving, setBrandSaving] = useState(false)
+
+  const openBranding = (e: Election) => {
+    setBrandFor(e)
+    let images: string[] = []
+    try { const a = JSON.parse(e.login_bg_images || "[]"); if (Array.isArray(a)) images = a } catch { /* ignore */ }
+    setBrand({ motto: e.motto || "", logo_url: e.logo_url || "", login_subtitle: e.login_subtitle || "", login_welcome: e.login_welcome || "", images })
+  }
+  const addImages = async (files: FileList | null) => {
+    if (!files) return
+    const added: string[] = []
+    for (const f of Array.from(files).slice(0, 8)) {
+      try { added.push(await resizeImage(f, 1280)) } catch { /* skip */ }
+    }
+    setBrand((p) => ({ ...p, images: [...p.images, ...added].slice(0, 8) }))
+  }
+  const setLogo = async (file?: File) => {
+    if (!file) return
+    try { setBrand((p) => ({ ...p, logo_url: "" })); const url = await resizeImage(file, 256, "image/png", 0.92); setBrand((p) => ({ ...p, logo_url: url })) } catch { /* ignore */ }
+  }
+  const saveBranding = async () => {
+    if (!brandFor) return
+    setBrandSaving(true)
+    const ok = await electionsDb.update(brandFor.id, {
+      motto: brand.motto || null,
+      logo_url: brand.logo_url || null,
+      login_subtitle: brand.login_subtitle || null,
+      login_welcome: brand.login_welcome || null,
+      login_bg_images: JSON.stringify(brand.images),
+    })
+    setBrandSaving(false)
+    if (!ok) { toast.error("Could not save branding"); return }
+    toast.success("Login look updated")
+    setBrandFor(null)
+    load()
+  }
 
   const load = async () => {
     setLoading(true)
@@ -126,6 +191,7 @@ export default function ElectionsPage() {
                   </div>
                   <div className="flex flex-none items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => useElection(e.id)}>Manage</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openBranding(e)}><Palette className="h-3.5 w-3.5" /> Edit look</Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild><Button size="sm" variant="ghost" className="text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                       <AlertDialogContent>
@@ -150,6 +216,54 @@ export default function ElectionsPage() {
             ))}
         </CardContent>
       </Card>
+
+      {/* Per-election login branding editor */}
+      <Dialog open={!!brandFor} onOpenChange={(o) => !o && setBrandFor(null)}>
+        <DialogContent className="max-h-[88vh] max-w-lg overflow-y-auto">
+          <DialogHeader><DialogTitle>Login look — {brandFor?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Customise what voters see on this election's <span className="font-mono">/e/{brandFor?.slug}</span> page.</p>
+
+            <div>
+              <Label>Logo</Label>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-muted ring-1 ring-border">
+                  {brand.logo_url ? <img src={brand.logo_url} alt="logo" className="h-full w-full object-contain" /> : <ImagePlus className="h-5 w-5 text-muted-foreground" />}
+                </div>
+                <label className="cursor-pointer">
+                  <div className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">Upload logo</div>
+                  <input type="file" accept="image/*,.cr2" className="hidden" onChange={(e) => setLogo(e.target.files?.[0])} />
+                </label>
+              </div>
+            </div>
+
+            <div><Label>Heading line (subtitle under the name)</Label><Input value={brand.login_subtitle} onChange={(e) => setBrand((p) => ({ ...p, login_subtitle: e.target.value }))} placeholder="e.g. Prefect Elections 2026" /></div>
+            <div><Label>Motto</Label><Input value={brand.motto} onChange={(e) => setBrand((p) => ({ ...p, motto: e.target.value }))} placeholder="e.g. Excellence & Integrity" /></div>
+            <div><Label>Welcome message</Label><Textarea rows={3} value={brand.login_welcome} onChange={(e) => setBrand((p) => ({ ...p, login_welcome: e.target.value }))} placeholder="Welcome text shown on the sign-in card" /></div>
+
+            <div>
+              <Label>Background slideshow images</Label>
+              <div className="mt-1 grid grid-cols-4 gap-2">
+                {brand.images.map((src, i) => (
+                  <div key={i} className="group relative aspect-video overflow-hidden rounded-md ring-1 ring-border">
+                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <button onClick={() => setBrand((p) => ({ ...p, images: p.images.filter((_, j) => j !== i) }))} className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition group-hover:opacity-100"><X className="h-3 w-3" /></button>
+                  </div>
+                ))}
+                {brand.images.length < 8 && (
+                  <label className="flex aspect-video cursor-pointer items-center justify-center rounded-md border border-dashed text-muted-foreground hover:bg-muted">
+                    <ImagePlus className="h-5 w-5" />
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addImages(e.target.files)} />
+                  </label>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Up to 8 images — they fade through behind the login.</p>
+            </div>
+
+            <Button onClick={saveBranding} disabled={brandSaving} className="w-full">{brandSaving ? "Saving…" : "Save login look"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

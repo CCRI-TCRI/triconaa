@@ -18,8 +18,17 @@ import { FaceCamera } from "@/components/face-camera"
 import { decodeDescriptor, findBestMatch } from "@/lib/face-recognition"
 import { toast } from "sonner"
 
+export interface LoginBranding {
+  schoolName?: string
+  logoUrl?: string
+  subtitle?: string
+  welcome?: string
+  bgImages?: string[]
+}
+
 interface BiometricAuthProps {
   onAuthSuccess: (studentId: string) => void
+  brand?: LoginBranding // per-election override (used on /e/[slug])
 }
 
 // Floating decorative icons around the login card
@@ -63,8 +72,12 @@ function FestiveDecor() {
   )
 }
 
-export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
-  const { schoolName, logoUrl } = useSchoolBranding()
+export function BiometricAuth({ onAuthSuccess, brand }: BiometricAuthProps) {
+  const global = useSchoolBranding()
+  const schoolName = brand?.schoolName || global.schoolName
+  const logoUrl = brand?.logoUrl || global.logoUrl
+  const subtitle = brand?.subtitle
+  const welcome = brand?.welcome
   const year = new Date().getFullYear()
   const [authMethod, setAuthMethod] = useState<"face" | "manual">("manual")
   const [tokenCode, setTokenCode] = useState("")
@@ -76,6 +89,12 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
   const [slide, setSlide] = useState(0)
 
   useEffect(() => {
+    // Per-election branding (on /e/[slug]) supplies its own slideshow images.
+    if (brand) {
+      setBgImages(brand.bgImages || [])
+      setBgVideo("")
+      return
+    }
     let active = true
     ;(async () => {
       const { data } = await supabase.from("election_settings").select("login_bg_images, login_bg_video").limit(1).single()
@@ -91,7 +110,7 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
     return () => {
       active = false
     }
-  }, [])
+  }, [brand])
 
   useEffect(() => {
     if (bgVideo || bgImages.length <= 1) return
@@ -208,7 +227,7 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
       {/* heading */}
       <div className="relative z-10 mb-6 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{schoolName}</h1>
-        <p className="mt-1 text-slate-300">Decision {year} · Student Elections</p>
+        <p className="mt-1 text-slate-300">{subtitle || `Decision ${year} · Student Elections`}</p>
       </div>
 
       {/* split card */}
@@ -220,7 +239,7 @@ export function BiometricAuth({ onAuthSuccess }: BiometricAuthProps) {
           </div>
           <h2 className="text-3xl font-bold">Hello~</h2>
           <p className="mt-3 max-w-[16rem] text-sm leading-relaxed text-slate-400">
-            Welcome to the {schoolName} student elections. Sign in with your voting code to cast your ballot.
+            {welcome || `Welcome to the ${schoolName} student elections. Sign in with your voting code to cast your ballot.`}
           </p>
         </div>
 
