@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { getPositionsWithCandidates, voteDb, userDb } from "@/lib/db"
+import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { Trophy, Users, Vote, Crown, TrendingUp, FileDown, RefreshCw, Award } from "lucide-react"
 import { extractLogoColor } from "@/lib/pdf-logo-color"
@@ -129,6 +129,7 @@ export default function ResultsPage() {
       const logo = await loadLogo()
       const maroon: [number, number, number] = logo ? await extractLogoColor(logo.data) : [22, 138, 173]
       const totalCandidates = results.reduce((s, r) => s + r.candidates.length, 0)
+      const cert = (await electionControl.get()).certification
 
       // ── Letterhead (every page) ──────────────────────────────
       const drawHeader = () => {
@@ -172,13 +173,14 @@ export default function ResultsPage() {
       const drawFooter = (page: number, total: number) => {
         doc.setDrawColor(...line)
         doc.setLineWidth(0.5)
-        doc.line(M, pageH - 34, pageW - M, pageH - 34)
+        doc.line(M, pageH - 30, pageW - M, pageH - 30)
         doc.setFont("helvetica", "normal")
         doc.setFontSize(7.5)
         doc.setTextColor(...muted)
-        doc.text(`${schoolName} · Royal Ballot Election System`, M, pageH - 22)
-        doc.text("CONFIDENTIAL", pageW / 2, pageH - 22, { align: "center" })
-        doc.text(`Page ${page} of ${total}`, pageW - M, pageH - 22, { align: "right" })
+        // Two items only — left (confidential mark) and right (page) — to avoid the
+        // long school name colliding with a centred label.
+        doc.text("Confidential · Royal Ballot Election System", M, pageH - 18)
+        doc.text(`Page ${page} of ${total}`, pageW - M, pageH - 18, { align: "right" })
       }
 
       // ── Summary panel (page 1) ───────────────────────────────
@@ -308,23 +310,46 @@ export default function ResultsPage() {
         { maxWidth: pageW - M * 2 },
       )
 
-      const sigY = y + 64
+      // Certification status banner
+      const bothSigned = !!cert.chair && !!cert.head
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(8.5)
+      doc.setTextColor(...(bothSigned ? ([22, 130, 70] as [number, number, number]) : muted))
+      doc.text(
+        bothSigned
+          ? `CERTIFIED — signed by both officials${cert.at ? ` on ${new Date(cert.at).toLocaleDateString()}` : ""}`
+          : "PENDING CERTIFICATION — awaiting both signatures",
+        M,
+        y + 34,
+      )
+
+      const sigY = y + 80
       const colGap = 40
       const sigW = (pageW - M * 2 - colGap) / 2
       ;[
-        { label: "Returning Officer", x: M },
-        { label: "Witness", x: M + sigW + colGap },
+        { label: "Chairperson, Electoral Commission", name: cert.chair, x: M },
+        { label: "Head Teacher", name: cert.head, x: M + sigW + colGap },
       ].forEach((s) => {
+        // signatory name sits just above the line, as a signature
+        if (s.name) {
+          doc.setFont("helvetica", "bolditalic")
+          doc.setFontSize(13)
+          doc.setTextColor(...maroon)
+          doc.text(s.name, s.x + 2, sigY - 4)
+        }
         doc.setDrawColor(...ink)
         doc.setLineWidth(0.6)
         doc.line(s.x, sigY, s.x + sigW, sigY)
         doc.setFont("helvetica", "normal")
         doc.setFontSize(8)
         doc.setTextColor(...muted)
-        doc.text(`${s.label} — Name & Signature`, s.x, sigY + 12)
-        // date line
-        doc.line(s.x, sigY + 36, s.x + sigW, sigY + 36)
-        doc.text("Date", s.x, sigY + 48)
+        doc.text(`${s.label} — ${s.name ? "Signed" : "Name & Signature"}`, s.x, sigY + 12)
+        // date
+        doc.text(
+          s.name && cert.at ? `Date: ${new Date(cert.at).toLocaleDateString()}` : "Date: ____________________",
+          s.x,
+          sigY + 28,
+        )
       })
 
       const pageCount = (doc as any).getNumberOfPages()
