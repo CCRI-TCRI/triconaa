@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { supabase, getErrorMessage, isSupabaseConfigured } from "@/lib/supabase"
-import { userDb } from "@/lib/db"
+import { userDb, currentElectionScope } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { FaceCamera } from "@/components/face-camera"
 import { encodeDescriptor } from "@/lib/face-recognition"
@@ -336,6 +336,7 @@ export default function VotersPage() {
         return c
       }
 
+      const election_id = await currentElectionScope()
       const toInsert: any[] = []
       let skipped = 0
       for (const r of validRows) {
@@ -355,6 +356,7 @@ export default function VotersPage() {
           class: importClass || r.class || "N/A",
           voting_code: genCode(),
           has_voted: false,
+          ...(election_id ? { election_id } : {}),
         })
       }
 
@@ -416,6 +418,7 @@ export default function VotersPage() {
     setSaving(true)
     try {
       const votingCode = generateVotingCode()
+      const election_id = await currentElectionScope()
       const voterData = {
         student_id: newVoter.student_id,
         full_name: newVoter.full_name,
@@ -423,6 +426,7 @@ export default function VotersPage() {
         voting_code: votingCode,
         has_voted: false,
         created_at: new Date().toISOString(),
+        ...(election_id ? { election_id } : {}),
       }
 
       const { data, error } = await supabase.from("users").insert([voterData]).select()
@@ -488,12 +492,14 @@ export default function VotersPage() {
       const prefix = classBulk.prefix.trim() || `${cls} Student`
       // Continue numbering after any existing voters that share this name prefix
       const existingInClass = voters.filter((v) => v.class === cls && v.full_name.startsWith(prefix)).length
+      const election_id = await currentElectionScope()
       const rows = Array.from({ length: n }, (_, i) => ({
         student_id: genId(),
         full_name: `${prefix} ${existingInClass + i + 1}`,
         class: cls,
         voting_code: genCode(),
         has_voted: false,
+        ...(election_id ? { election_id } : {}),
       }))
 
       const { error } = await supabase.from("users").insert(rows)

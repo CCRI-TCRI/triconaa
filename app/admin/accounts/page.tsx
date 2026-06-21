@@ -13,7 +13,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { UserCog, UserPlus, Shield, Gavel, GraduationCap, Trash2, KeyRound } from "lucide-react"
-import { accountDb, type AdminAccount, type AdminRole } from "@/lib/db"
+import { accountDb, electionsDb, type AdminAccount, type AdminRole, type Election } from "@/lib/db"
 import { toast } from "sonner"
 
 const ROLE_META: Record<AdminRole, { label: string; desc: string; icon: typeof Shield; cls: string }> = {
@@ -27,14 +27,18 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [form, setForm] = useState({ username: "", password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "" })
+  const [form, setForm] = useState({ username: "", password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "", electionId: "" })
 
   const [editing, setEditing] = useState<AdminAccount | null>(null)
-  const [editForm, setEditForm] = useState({ password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "" })
+  const [editForm, setEditForm] = useState({ password: "", role: "headteacher" as AdminRole, full_name: "", securityQuestion: "", securityAnswer: "", electionId: "" })
+  const [elections, setElections] = useState<Election[]>([])
+  const electionName = (id?: string | null) => elections.find((e) => e.id === id)?.name
 
   const load = async () => {
     setLoading(true)
-    setAccounts(await accountDb.list())
+    const [accs, els] = await Promise.all([accountDb.list(), electionsDb.list()])
+    setAccounts(accs)
+    setElections(els)
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -47,18 +51,18 @@ export default function AccountsPage() {
       return
     }
     setSaving(true)
-    const created = await accountDb.create(form)
+    const created = await accountDb.create({ ...form, electionId: form.role === "admin" ? null : form.electionId || null })
     setSaving(false)
     if (!created) { toast.error("Could not create account — the username may already exist"); return }
     toast.success(`Account "${created.username}" created`)
-    setForm({ username: "", password: "", role: "headteacher", full_name: "", securityQuestion: "", securityAnswer: "" })
+    setForm({ username: "", password: "", role: "headteacher", full_name: "", securityQuestion: "", securityAnswer: "", electionId: "" })
     setAddOpen(false)
     load()
   }
 
   const openEdit = (a: AdminAccount) => {
     setEditing(a)
-    setEditForm({ password: "", role: a.role, full_name: a.full_name || "", securityQuestion: "", securityAnswer: "" })
+    setEditForm({ password: "", role: a.role, full_name: a.full_name || "", securityQuestion: "", securityAnswer: "", electionId: a.election_id || "" })
   }
 
   const saveEdit = async () => {
@@ -74,6 +78,7 @@ export default function AccountsPage() {
       full_name: editForm.full_name,
       securityQuestion: editForm.securityQuestion || undefined,
       securityAnswer: editForm.securityAnswer || undefined,
+      electionId: editForm.role === "admin" ? null : editForm.electionId || null,
     })
     setSaving(false)
     if (!ok) { toast.error("Could not update account"); return }
@@ -122,6 +127,15 @@ export default function AccountsPage() {
                 </Select>
                 <p className="mt-1 text-xs text-muted-foreground">{ROLE_META[form.role].desc}</p>
               </div>
+              {form.role !== "admin" && elections.length > 0 && (
+                <div>
+                  <Label>Election (this account only sees this one)</Label>
+                  <Select value={form.electionId} onValueChange={(v) => setForm((p) => ({ ...p, electionId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select an election" /></SelectTrigger>
+                    <SelectContent>{elections.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )}
               <div><Label>Security question (for password reset)</Label><Input value={form.securityQuestion} onChange={(e) => setForm((p) => ({ ...p, securityQuestion: e.target.value }))} placeholder="e.g. Your first school?" /></div>
               <div><Label>Security answer</Label><Input value={form.securityAnswer} onChange={(e) => setForm((p) => ({ ...p, securityAnswer: e.target.value }))} /></div>
               <Button onClick={addAccount} disabled={saving} className="w-full">{saving ? "Creating…" : "Create account"}</Button>
@@ -146,7 +160,7 @@ export default function AccountsPage() {
                   <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-lg ${meta.cls}`}><Icon className="h-5 w-5" /></div>
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{a.full_name || a.username}</p>
-                    <p className="truncate text-xs text-muted-foreground">@{a.username}</p>
+                    <p className="truncate text-xs text-muted-foreground">@{a.username}{a.election_id && electionName(a.election_id) ? ` · ${electionName(a.election_id)}` : ""}</p>
                   </div>
                 </div>
                 <div className="flex flex-none items-center gap-2">
@@ -193,6 +207,15 @@ export default function AccountsPage() {
               </Select>
               <p className="mt-1 text-xs text-muted-foreground">{ROLE_META[editForm.role].desc}</p>
             </div>
+            {editForm.role !== "admin" && elections.length > 0 && (
+              <div>
+                <Label>Election</Label>
+                <Select value={editForm.electionId} onValueChange={(v) => setEditForm((p) => ({ ...p, electionId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select an election" /></SelectTrigger>
+                  <SelectContent>{elections.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Security question</Label><Input value={editForm.securityQuestion} onChange={(e) => setEditForm((p) => ({ ...p, securityQuestion: e.target.value }))} placeholder="leave blank to keep current" /></div>
             <div><Label>Security answer</Label><Input value={editForm.securityAnswer} onChange={(e) => setEditForm((p) => ({ ...p, securityAnswer: e.target.value }))} placeholder="leave blank to keep current" /></div>
             <Button onClick={saveEdit} disabled={saving} className="w-full">{saving ? "Saving…" : "Save changes"}</Button>

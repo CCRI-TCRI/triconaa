@@ -45,6 +45,12 @@ async function activeScope(explicit?: string | null): Promise<string | null> {
   return id || (await primaryElectionId())
 }
 
+// Public accessor for callers outside the data layer (e.g. the Voters page) that
+// need to stamp the current election on their own inserts.
+export async function currentElectionScope(): Promise<string | null> {
+  return activeScope()
+}
+
 // PostgREST returns at most ~1000 rows per request, so a plain .select("*")
 // silently truncates large tables (the votes table in particular). This pages
 // through every row with .range(). Rows are pulled oldest-first so that votes
@@ -611,6 +617,7 @@ export interface AdminAccount {
   username: string
   role: AdminRole
   full_name: string | null
+  election_id?: string | null
   created_at?: string
 }
 
@@ -618,14 +625,16 @@ export const accountDb = {
   // Validate a login. Returns the account (without password) or null.
   authenticate: async (username: string, password: string): Promise<AdminAccount | null> => {
     const uname = username.trim()
-    const { data, error } = await supabase
-      .from("admin_accounts")
-      .select("id, username, role, full_name, password")
-      .eq("username", uname)
-      .limit(1)
-      .maybeSingle()
-    if (!error && data && data.password === password) {
-      return { id: data.id, username: data.username, role: data.role as AdminRole, full_name: data.full_name }
+    // Try with election_id (multi-election); fall back without it if the column is absent.
+    let data: any = null
+    const withEid = await supabase.from("admin_accounts").select("id, username, role, full_name, password, election_id").eq("username", uname).limit(1).maybeSingle()
+    if (!withEid.error) data = withEid.data
+    else {
+      const basic = await supabase.from("admin_accounts").select("id, username, role, full_name, password").eq("username", uname).limit(1).maybeSingle()
+      data = basic.data
+    }
+    if (data && data.password === password) {
+      return { id: data.id, username: data.username, role: data.role as AdminRole, full_name: data.full_name, election_id: data.election_id ?? null }
     }
     // Built-in administrator fallback — guarantees the admin is never locked out,
     // and covers the window before the admin_accounts table is provisioned.
@@ -636,15 +645,13 @@ export const accountDb = {
   },
 
   list: async (): Promise<AdminAccount[]> => {
-    const { data, error } = await supabase
-      .from("admin_accounts")
-      .select("id, username, role, full_name, created_at")
-      .order("created_at", { ascending: true })
-    if (error) { console.error("accountDb.list:", error.message); return [] }
-    return (data ?? []) as AdminAccount[]
+    let res = await supabase.from("admin_accounts").select("id, username, role, full_name, election_id, created_at").order("created_at", { ascending: true })
+    if (res.error) res = await supabase.from("admin_accounts").select("id, username, role, full_name, created_at").order("created_at", { ascending: true }) as any
+    if (res.error) { console.error("accountDb.list:", res.error.message); return [] }
+    return (res.data ?? []) as AdminAccount[]
   },
 
-  create: async (account: { username: string; password: string; role: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string }): Promise<AdminAccount | null> => {
+  create: async (account: { username: string; password: string; role: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string; electionId?: string | null }): Promise<AdminAccount | null> => {
     const { data, error } = await supabase
       .from("admin_accounts")
       .insert([{
@@ -654,6 +661,7 @@ export const accountDb = {
         full_name: account.full_name?.trim() || null,
         security_question: account.securityQuestion || null,
         security_answer: account.securityAnswer || null,
+        ...(account.electionId ? { election_id: account.electionId } : {}),
       }])
       .select("id, username, role, full_name, created_at")
       .single()
@@ -662,13 +670,14 @@ export const accountDb = {
     return data as AdminAccount
   },
 
-  update: async (id: string, updates: { password?: string; role?: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string }): Promise<boolean> => {
+  update: async (id: string, updates: { password?: string; role?: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string; electionId?: string | null }): Promise<boolean> => {
     const patch: Record<string, unknown> = {}
     if (updates.password) patch.password = updates.password
     if (updates.role) patch.role = updates.role
     if (updates.full_name !== undefined) patch.full_name = updates.full_name?.trim() || null
     if (updates.securityQuestion !== undefined) patch.security_question = updates.securityQuestion || null
     if (updates.securityAnswer !== undefined) patch.security_answer = updates.securityAnswer || null
+    if (updates.electionId !== undefined) patch.election_id = updates.electionId
     if (Object.keys(patch).length === 0) return true
     const { error } = await supabase.from("admin_accounts").update(patch).eq("id", id)
     if (error) { console.error("accountDb.update:", error.message); return false }

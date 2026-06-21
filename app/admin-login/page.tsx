@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { setAdminSession, ROLE_HOME } from "@/components/admin-guard"
-import { accountDb } from "@/lib/db"
+import { accountDb, setCurrentElectionId } from "@/lib/db"
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -43,6 +43,8 @@ export default function AdminLoginPage() {
       const account = await accountDb.authenticate(username, password)
       if (account) {
         setAdminSession(account.role, account.full_name || account.username)
+        // Chairperson/head teacher are bound to their election; admin manages all.
+        setCurrentElectionId(account.election_id || null)
         router.push(ROLE_HOME[account.role])
       } else {
         setError("Invalid credentials. Please try again.")
