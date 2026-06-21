@@ -46,8 +46,11 @@ export function setCurrentElectionId(id: string | null) {
 // (i.e. before the multi-election migration is applied → single-election behaviour).
 async function activeScope(explicit?: string | null): Promise<string | null> {
   if (!(await scopingAvailable())) return null
-  const id = explicit ?? getCurrentElectionId()
-  return id || (await primaryElectionId())
+  // Only scope when an election is explicitly chosen (admin switcher) or set as
+  // the current context (e.g. an /e/[slug] voter page). With nothing selected we
+  // show ALL data — so the admin's "All" view never appears empty regardless of
+  // how rows are tagged.
+  return (explicit ?? getCurrentElectionId()) || null
 }
 
 // Apply an election filter to a query. The primary election also absorbs any
