@@ -15,8 +15,13 @@ let _primaryId: string | null | undefined = undefined
 
 export async function scopingAvailable(): Promise<boolean> {
   if (_scopeAvail !== null) return _scopeAvail
-  const { error } = await supabase.from("elections").select("id").limit(1)
-  _scopeAvail = !error
+  // Scoping needs BOTH the elections table AND an election_id column on the data
+  // tables. If either is missing (e.g. a partially-applied migration) we disable
+  // scoping so data is shown as a single election rather than disappearing.
+  const e = await supabase.from("elections").select("id").limit(1)
+  if (e.error) { _scopeAvail = false; return false }
+  const col = await supabase.from("votes").select("election_id").limit(1)
+  _scopeAvail = !col.error
   return _scopeAvail
 }
 
@@ -72,10 +77,20 @@ async function fetchAllRows<T>(table: string, electionId?: string | null): Promi
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase.from(table).select("*")
     q = await applyScope(q, electionId ?? null)
-    const { data, error } = await q
+    let { data, error } = await q
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1)
+    if (error && electionId) {
+      // Scoped query failed (e.g. missing column) — fall back to unscoped so data
+      // is never hidden. Disable scoping for the rest of the session.
+      _scopeAvail = false
+      const u = await supabase.from(table).select("*")
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1)
+      data = u.data; error = u.error
+    }
     if (error) { console.error(`fetchAllRows(${table}):`, error.message); break }
     const batch = (data ?? []) as T[]
     all.push(...batch)
@@ -334,17 +349,29 @@ export const candidateDb = {
 
 export const positionDb = {
   getAll: async (): Promise<Position[]> => {
+    const scope = await activeScope()
     let q = supabase.from("positions").select("*")
-    q = await applyScope(q, await activeScope())
-    const { data, error } = await q.order("display_order", { ascending: true })
+    q = await applyScope(q, scope)
+    let { data, error } = await q.order("display_order", { ascending: true })
+    if (error && scope) {
+      _scopeAvail = false
+      const u = await supabase.from("positions").select("*").order("display_order", { ascending: true })
+      data = u.data; error = u.error
+    }
     if (error) { console.error("positionDb.getAll:", error.message); return [] }
     return data ?? []
   },
 
   getActive: async (): Promise<Position[]> => {
+    const scope = await activeScope()
     let q = supabase.from("positions").select("*").eq("is_active", true)
-    q = await applyScope(q, await activeScope())
-    const { data, error } = await q.order("display_order", { ascending: true })
+    q = await applyScope(q, scope)
+    let { data, error } = await q.order("display_order", { ascending: true })
+    if (error && scope) {
+      _scopeAvail = false
+      const u = await supabase.from("positions").select("*").eq("is_active", true).order("display_order", { ascending: true })
+      data = u.data; error = u.error
+    }
     if (error) return []
     return data ?? []
   },
@@ -431,10 +458,22 @@ export async function getPositionsWithCandidates(electionId?: string | null): Pr
   let candQ = supabase.from("candidates").select("*").eq("is_approved", true)
   posQ = await applyScope(posQ, scope)
   candQ = await applyScope(candQ, scope)
-  const [{ data: positions, error: posErr }, { data: candidates, error: candErr }] = await Promise.all([
+  let [{ data: positions, error: posErr }, { data: candidates, error: candErr }] = await Promise.all([
     posQ.order("display_order", { ascending: true }),
     candQ,
   ])
+
+  // Scoped query failed (e.g. missing election_id column) — fall back to unscoped
+  // so the ballot/dashboard never shows empty.
+  if ((posErr || candErr) && scope) {
+    _scopeAvail = false
+    const r = await Promise.all([
+      supabase.from("positions").select("*").eq("is_active", true).order("display_order", { ascending: true }),
+      supabase.from("candidates").select("*").eq("is_approved", true),
+    ])
+    positions = r[0].data; posErr = r[0].error
+    candidates = r[1].data; candErr = r[1].error
+  }
 
   if (posErr) { console.error("getPositionsWithCandidates positions:", posErr.message); return [] }
 
