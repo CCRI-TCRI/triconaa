@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import type { ElectionSettings } from "@/lib/supabase"
 import { BRANDING_UPDATED_EVENT, DEFAULT_BRANDING } from "@/components/school-branding-provider"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Settings, Shield, Palette, Database, Save, RefreshCw, School, Upload, Trash2, ImageIcon } from "lucide-react"
 
 const DEFAULT_SETTINGS: ElectionSettings = {
@@ -230,6 +231,23 @@ export default function SettingsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Palette className="w-5 h-5" />Appearance</CardTitle>
+          <CardDescription>Switch the whole site between light and dark instantly.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4 dark:border-white/10">
+            <div>
+              <p className="font-medium">Theme</p>
+              <p className="text-sm text-muted-foreground">Light / dark mode — applies immediately, no reload.</p>
+            </div>
+            <ThemeToggle />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Database Status */}
       <Card>

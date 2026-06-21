@@ -867,3 +867,28 @@ export const archiveDb = {
     return true
   },
 }
+
+// ── Broadcast custom slides (message / head-to-head) ──────────
+export interface BroadcastSlide {
+  id: string
+  type: "message" | "head2head"
+  title?: string
+  subtitle?: string
+  positionId?: string
+}
+
+export const broadcastSlidesDb = {
+  get: async (): Promise<BroadcastSlide[]> => {
+    const { data, error } = await supabase.from("election_settings").select("broadcast_slides").limit(1).maybeSingle()
+    if (error || !data?.broadcast_slides) return []
+    try { const a = JSON.parse(data.broadcast_slides); return Array.isArray(a) ? a : [] } catch { return [] }
+  },
+  set: async (slides: BroadcastSlide[]): Promise<boolean> => {
+    const { data: row } = await supabase.from("election_settings").select("id").limit(1).single()
+    if (!row) return false
+    const { error } = await supabase.from("election_settings").update({ broadcast_slides: JSON.stringify(slides) }).eq("id", row.id)
+    if (error) { console.error("broadcastSlidesDb.set:", error.message); return false }
+    await auditDb.log("broadcast.slides", `Updated broadcast slides (${slides.length})`)
+    return true
+  },
+}

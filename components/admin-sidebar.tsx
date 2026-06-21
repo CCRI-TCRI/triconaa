@@ -41,6 +41,7 @@ import {
   History,
   Archive,
   Layers,
+  Tv,
 } from "lucide-react"
 
 const menuItems = [
@@ -117,6 +118,11 @@ const menuItems = [
         title: "Reveal Show",
         url: "/admin/reveal",
         icon: Sparkles,
+      },
+      {
+        title: "Broadcast Slides",
+        url: "/admin/slides",
+        icon: Tv,
       },
       {
         title: "Analytics",

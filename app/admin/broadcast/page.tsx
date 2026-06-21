@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence, animate, useMotionValue } from "framer-motion"
-import { getPositionsWithCandidates, voteDb, userDb, electionControl } from "@/lib/db"
+import { getPositionsWithCandidates, voteDb, userDb, electionControl, broadcastSlidesDb, type BroadcastSlide } from "@/lib/db"
 import { useSchoolBranding } from "@/components/school-branding-provider"
 import { useEmergency } from "@/components/emergency-broadcast"
 import { LockdownScreen } from "@/components/lockdown-screen"
@@ -68,6 +68,7 @@ export default function BroadcastPage() {
   const [pageUrl, setPageUrl] = useState("")
   const [muted, setMuted] = useState(false)
   const [classTurnout, setClassTurnout] = useState<{ cls: string; voted: number; total: number; pct: number }[]>([])
+  const [customSlides, setCustomSlides] = useState<BroadcastSlide[]>([])
   const [light, setLight] = useState(false)
 
   useEffect(() => { setLight(localStorage.getItem("broadcast-light") === "1") }, [])
@@ -96,12 +97,14 @@ export default function BroadcastPage() {
   // ── live data ────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     try {
-      const [{ status }, positions, votes, users] = await Promise.all([
+      const [{ status }, positions, votes, users, slides] = await Promise.all([
         electionControl.get(),
         getPositionsWithCandidates(),
         voteDb.getAll(),
         userDb.getAll(),
+        broadcastSlidesDb.get(),
       ])
+      setCustomSlides(slides)
       // A stopped or completed election is final — leaders become winners.
       setCompleted(status === "completed" || status === "stopped")
       const data: Race[] = positions.map((p) => {
@@ -155,6 +158,7 @@ export default function BroadcastPage() {
       .channel("broadcast-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "votes" }, () => fetchData())
       .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "election_settings" }, () => fetchData())
       .subscribe()
     return () => { clearInterval(t); supabase.removeChannel(channel) }
   }, [fetchData])
@@ -190,18 +194,18 @@ export default function BroadcastPage() {
     return () => clearInterval(t)
   }, [])
 
-  // auto-advance through positions, then a final turnout slide
+  // auto-advance through positions, then turnout, then any custom slides
   useEffect(() => {
     if (paused || races.length === 0) return
-    const slides = races.length + 1
+    const slides = races.length + 1 + customSlides.length
     const t = setTimeout(() => setIndex((i) => (i + 1) % slides), DWELL_MS)
     return () => clearTimeout(t)
-  }, [paused, races.length, index])
+  }, [paused, races.length, customSlides.length, index])
 
   const go = useCallback((dir: number) => {
-    const n = races.length + 1
+    const n = races.length + 1 + customSlides.length
     setIndex((i) => (i + dir + n) % n)
-  }, [races.length])
+  }, [races.length, customSlides.length])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -228,9 +232,11 @@ export default function BroadcastPage() {
     )
   }
 
-  const onTurnout = index >= races.length
+  const onTurnout = index === races.length
+  const customIdx = index - races.length - 1
+  const customSlide = customIdx >= 0 ? customSlides[customIdx] : null
   const race = races[index]
-  const slides = races.length + 1
+  const slides = races.length + 1 + customSlides.length
   const leaderTag = completed ? "WINNER" : "LEADING"
 
   // ── ticker headlines ─────────────────────────────────────────
@@ -333,14 +339,66 @@ export default function BroadcastPage() {
       <div className="relative z-10 min-h-0 flex-1 px-3 py-3 sm:px-7 sm:py-5">
         <AnimatePresence mode="wait">
           <motion.div
-            key={onTurnout ? "turnout" : race.id}
+            key={customSlide ? customSlide.id : onTurnout ? "turnout" : race.id}
             initial={{ opacity: 0, x: 60 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -60 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             className="flex h-full min-h-0 flex-col"
           >
-            {onTurnout ? (
+            {customSlide ? (
+              customSlide.type === "message" ? (
+                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                  <div className="mb-6 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#ffffff] shadow-lg ring-4 ring-[#f5c542]/40">
+                    <img src={logoUrl} alt={schoolName} className="h-14 w-14 object-contain" />
+                  </div>
+                  <h2 className="max-w-4xl text-4xl font-black uppercase leading-tight tracking-tight sm:text-6xl">{customSlide.title}</h2>
+                  {customSlide.subtitle && <p className={`mt-4 max-w-2xl text-lg sm:text-2xl ${T.strong}`}>{customSlide.subtitle}</p>}
+                  <div className="mt-8 h-1.5 w-40 rounded-full bg-gradient-to-r from-[#e11d2a] via-[#f5c542] to-[#1d4ed8]" />
+                </div>
+              ) : (() => {
+                const r = races.find((x) => x.id === customSlide.positionId)
+                const a = r?.candidates[0]
+                const b = r?.candidates[1]
+                const pct = (c?: Cand) => (r && r.total > 0 && c ? (c.votes / r.total) * 100 : 0)
+                const lead = a && b ? a.votes - b.votes : 0
+                const reporting = stats.totalVoters > 0 ? Math.round((stats.votedCount / stats.totalVoters) * 100) : 0
+                return (
+                  <div className="flex h-full min-h-0 flex-col">
+                    <div className="mb-4 flex-none text-center">
+                      <h2 className="text-3xl font-black uppercase leading-none tracking-tight sm:text-5xl">{r?.name || "Head to head"}</h2>
+                      <span className="mt-2 inline-block rounded bg-black px-3 py-1 text-xs font-black uppercase tracking-widest text-white">Vote in: {reporting}%</span>
+                    </div>
+                    <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+                      {/* Left — blue */}
+                      <div className={`relative flex overflow-hidden rounded-2xl bg-[#1d4ed8] text-white shadow-xl ${lead > 0 ? "ring-4 ring-[#f5c542]" : ""}`}>
+                        <div className="w-2/5 flex-none overflow-hidden bg-black/20">
+                          {a?.photo_url ? <img src={a.photo_url} alt={a.full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-4xl font-black text-white/40">{a ? initials(a.full_name) : "—"}</div>}
+                        </div>
+                        <div className="flex flex-1 flex-col justify-center p-4">
+                          <p className="truncate text-lg font-bold uppercase sm:text-2xl">{a?.full_name || "—"}</p>
+                          <p className="text-5xl font-black leading-none sm:text-7xl">{pct(a).toFixed(1)}%</p>
+                          <p className="mt-1 text-sm font-semibold text-white/80 sm:text-base">{(a?.votes ?? 0).toLocaleString()} votes</p>
+                          {lead > 0 && <p className="mt-1 text-xs font-black uppercase tracking-wider text-[#f5c542]">▶ Lead: {lead.toLocaleString()}</p>}
+                        </div>
+                      </div>
+                      {/* Right — red */}
+                      <div className={`relative flex overflow-hidden rounded-2xl bg-[#dc2626] text-white shadow-xl ${lead < 0 ? "ring-4 ring-[#f5c542]" : ""}`}>
+                        <div className="flex flex-1 flex-col justify-center p-4 text-right">
+                          <p className="truncate text-lg font-bold uppercase sm:text-2xl">{b?.full_name || "—"}</p>
+                          <p className="text-5xl font-black leading-none sm:text-7xl">{pct(b).toFixed(1)}%</p>
+                          <p className="mt-1 text-sm font-semibold text-white/80 sm:text-base">{(b?.votes ?? 0).toLocaleString()} votes</p>
+                          {lead < 0 && <p className="mt-1 text-xs font-black uppercase tracking-wider text-[#f5c542]">Lead: {Math.abs(lead).toLocaleString()} ◀</p>}
+                        </div>
+                        <div className="w-2/5 flex-none overflow-hidden bg-black/20">
+                          {b?.photo_url ? <img src={b.photo_url} alt={b.full_name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-4xl font-black text-white/40">{b ? initials(b.full_name) : "—"}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()
+            ) : onTurnout ? (
               <div className="flex h-full min-h-0 flex-col">
                 <div className="mb-4 flex flex-none items-end justify-between gap-3 border-l-4 border-[#f5c542] pl-3 sm:pl-4">
                   <div>
