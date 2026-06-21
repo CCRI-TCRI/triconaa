@@ -4,6 +4,8 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SchoolBrandingProvider } from "@/components/school-branding-provider"
 import { EmergencyProvider } from "@/components/emergency-broadcast"
+import { Toaster } from "@/components/ui/sonner"
+import { Toaster as ShadToaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
   title: "Royal Ballot - St. Theresa S.S. Buloba-Kasero",
@@ -40,6 +42,8 @@ export default function RootLayout({
             <EmergencyProvider>{children}</EmergencyProvider>
           </SchoolBrandingProvider>
         </ThemeProvider>
+        <Toaster />
+        <ShadToaster />
       </body>
     </html>
   )

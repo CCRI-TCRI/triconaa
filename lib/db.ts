@@ -660,19 +660,24 @@ export const accountDb = {
   },
 
   create: async (account: { username: string; password: string; role: AdminRole; full_name?: string; securityQuestion?: string; securityAnswer?: string; electionId?: string | null }): Promise<AdminAccount | null> => {
-    const { data, error } = await supabase
-      .from("admin_accounts")
-      .insert([{
-        username: account.username.trim(),
-        password: account.password,
-        role: account.role,
-        full_name: account.full_name?.trim() || null,
-        security_question: account.securityQuestion || null,
-        security_answer: account.securityAnswer || null,
-        ...(account.electionId ? { election_id: account.electionId } : {}),
-      }])
-      .select("id, username, role, full_name, created_at")
-      .single()
+    const base = {
+      username: account.username.trim(),
+      password: account.password,
+      role: account.role,
+      full_name: account.full_name?.trim() || null,
+    }
+    const full = {
+      ...base,
+      security_question: account.securityQuestion || null,
+      security_answer: account.securityAnswer || null,
+      ...(account.electionId ? { election_id: account.electionId } : {}),
+    }
+    // Try with the optional columns; if any don't exist yet, fall back to the core fields.
+    let res = await supabase.from("admin_accounts").insert([full]).select("id, username, role, full_name, created_at").single()
+    if (res.error) {
+      res = await supabase.from("admin_accounts").insert([base]).select("id, username, role, full_name, created_at").single() as any
+    }
+    const { data, error } = res
     if (error) { console.error("accountDb.create:", error.message); return null }
     await auditDb.log("account.create", `Created ${account.role} account "${account.username}"`)
     return data as AdminAccount
