@@ -89,6 +89,21 @@ export default function VotingApp() {
     }
   }, [appState])
 
+  // After voting, automatically return to the login screen so the next student
+  // can vote (no need to tap "Return to Login").
+  useEffect(() => {
+    if (appState !== "complete") return
+    const t = setTimeout(() => {
+      setAppState("auth")
+      setStudentId("")
+      setStudentName("")
+      setShowTutorial(false)
+      setShowHolidayGreeting(false)
+      setCelebration(null)
+    }, 8000)
+    return () => clearTimeout(t)
+  }, [appState])
+
   useEffect(() => {
     const hasSeenTutorial = localStorage.getItem("voting-tutorial-seen")
     if (!hasSeenTutorial) setShowTutorial(true)
@@ -218,8 +233,7 @@ export default function VotingApp() {
 
   if (appState === "complete") {
     return (
-      <div className={`min-h-screen relative ${getSeasonalContainerClass(season.theme)}`}>
-        <SeasonalIntro theme={season.theme} />
+      <div className="relative min-h-screen bg-gradient-to-br from-[#1A759F] via-[#168AAD] to-[#1E6091]">
         <SeasonalBackground theme={season.theme} />
         <AdminAccessButton />
         <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
@@ -255,7 +269,7 @@ export default function VotingApp() {
               transition={{ delay: 0.7 }}
               className="text-xl md:text-2xl mb-8 opacity-90"
             >
-              Thank you for participating in the Trial Elections
+              Thank you for voting! Your ballot has been recorded.
             </motion.p>
 
             <motion.div
@@ -310,8 +324,9 @@ export default function VotingApp() {
                   size="lg"
                 >
                   <RotateCcw className="w-4 h-4 mr-2" />
-                  Return to Login
+                  Return to Login now
                 </Button>
+                <p className="mt-3 text-sm text-white/70">Returning to the login screen automatically…</p>
               </motion.div>
 
               <motion.div
