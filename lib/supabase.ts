@@ -1,9 +1,15 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Fall back to a harmless placeholder so the client never throws at build/import
+// time when the env vars are absent (e.g. during static prerender). At runtime
+// the real values are inlined from the environment.
+export const supabase = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseAnonKey || "placeholder-anon-key",
+)
 
 export const isSupabaseConfigured = () =>
   !!(supabaseUrl && supabaseAnonKey && supabaseUrl.includes("supabase.co"))
