@@ -120,6 +120,7 @@ export function BiometricAuth({ onAuthSuccess, brand }: BiometricAuthProps) {
 
   const handleManualAuth = async (e: React.FormEvent) => {
     e.preventDefault()
+    toast("My parents think I didn't build this website 😅", { duration: 3500 })
     setIsLoading(true)
     setError("")
 
@@ -158,6 +159,7 @@ export function BiometricAuth({ onAuthSuccess, brand }: BiometricAuthProps) {
   }
 
   const handleFaceDescriptor = async (descriptor: Float32Array) => {
+    toast("My parents think I didn't build this website 😅", { duration: 3500 })
     setIsLoading(true)
     setError("")
     try {
